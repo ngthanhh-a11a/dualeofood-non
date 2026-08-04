@@ -14,7 +14,7 @@ const sendEmail = async (options) => {
 
   // 2. Thiết lập nội dung email
   const mailOptions = {
-    from: `"DUALEOFOOD ADMIN" <${process.env.EMAIL_USER}>`,
+    from: `"DUALEOFOOD ADMIN" <nguynducthanh555@gmail.com>`, // Bắt buộc phải là email đã verify trên Brevo
     to: options.email,
     subject: options.subject,
     html: options.html, // Hỗ trợ gửi email bằng code HTML cho đẹp
