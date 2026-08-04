@@ -1,0 +1,49 @@
+/* Tùy chỉnh giao diện react-datepicker để hợp với theme của dự án */
+
+.react-datepicker-wrapper .react-datepicker__input-container input {
+    /* Kế thừa các class của input cũ để giao diện không bị vỡ */
+    border-width: 1px;
+    border-color: #d1d5db; /* gray-300 */
+    border-radius: 0.5rem; /* rounded-lg */
+    padding-left: 2.5rem; /* pl-10 */
+    padding-right: 0.75rem; /* pr-3 */
+    padding-top: 0.5rem; /* py-2 */
+    padding-bottom: 0.5rem; /* py-2 */
+    font-weight: 600; /* font-semibold */
+    color: #334155; /* slate-700 */
+}
+
+.react-datepicker-wrapper .react-datepicker__input-container input:focus {
+    outline: none;
+    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    --tw-ring-color: #38bdf8; /* ring-sky-500 */
+}
+
+.react-datepicker {
+  font-family: inherit; /* Dùng font của dự án */
+  border: 1px solid #e2e8f0; /* gray-200 */
+  border-radius: 1rem; /* rounded-2xl */
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.react-datepicker__header {
+  background-color: #f0f9ff; /* sky-50 */
+  border-bottom: 1px solid #e0f2fe; /* sky-100 */
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+.react-datepicker__current-month, .react-datepicker-time__header, .react-datepicker-year-header {
+  color: #0c4a6e; /* sky-800 */
+  font-weight: bold;
+}
+
+.react-datepicker__day--selected, .react-datepicker__day--in-selecting-range, .react-datepicker__day--in-range {
+  background-color: #0ea5e9; /* sky-500 */
+}
+
+.react-datepicker__navigation-icon::before {
+    border-color: #0ea5e9; /* sky-500 */
+}
