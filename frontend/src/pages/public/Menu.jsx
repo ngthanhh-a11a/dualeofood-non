@@ -12,7 +12,7 @@ import { FiSearch, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
 // Component Card sản phẩm
 const ProductCard = ({ product, onAddToCart, onProductClick, delay }) => (
   <div 
-    className="product-card group bg-white rounded-[2rem] p-4 shadow-sm hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] transition-shadow duration-500 border border-gray-100/50 flex flex-col opacity-0 animate-fade-in-up"
+    className="product-card group bg-white rounded-[2rem] p-3 md:p-4 shadow-sm hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] transition-shadow duration-500 border border-gray-100/50 flex flex-col opacity-0 animate-fade-in-up"
     style={{ animationDelay: `${delay}ms` }}
   >
     <div 
@@ -30,7 +30,7 @@ const ProductCard = ({ product, onAddToCart, onProductClick, delay }) => (
     
     <div className="flex-1 flex flex-col px-2">
       <h3 
-        className="text-[1.1rem] font-bold text-slate-800 mb-1 group-hover:text-orange-500 transition-colors line-clamp-2 cursor-pointer leading-tight"
+        className="text-[0.9rem] md:text-[1.1rem] font-bold text-slate-800 mb-1 group-hover:text-orange-500 transition-colors line-clamp-2 cursor-pointer leading-tight"
         onClick={() => onProductClick(product._id)}
       >
         {product.name}
@@ -42,12 +42,12 @@ const ProductCard = ({ product, onAddToCart, onProductClick, delay }) => (
       </div>
 
       <div className="flex items-center justify-between mt-auto pt-2">
-        <span className="text-xl font-black text-slate-800">
-          {product.price?.toLocaleString('vi-VN') || '0'}<span className="text-sm font-bold text-orange-500 ml-1">đ</span>
+        <span className="text-lg md:text-xl font-black text-slate-800">
+          {product.price?.toLocaleString('vi-VN') || '0'}<span className="text-xs md:text-sm font-bold text-orange-500 ml-1">đ</span>
         </span>
         <button 
           onClick={(e) => onAddToCart(product, e)}
-          className="w-12 h-12 shrink-0 bg-gradient-to-r from-sky-400 to-sky-600 text-white rounded-2xl flex items-center justify-center hover:shadow-lg hover:shadow-sky-500/30 hover:-translate-y-1 transition-all duration-300 group/btn relative overflow-hidden"
+          className="w-9 h-9 md:w-12 md:h-12 shrink-0 bg-gradient-to-r from-sky-400 to-sky-600 text-white rounded-xl md:rounded-2xl flex items-center justify-center hover:shadow-lg hover:shadow-sky-500/30 hover:-translate-y-1 transition-all duration-300 group/btn relative overflow-hidden"
         >
            <FiShoppingBag className="w-5 h-5 relative z-10" />
            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
@@ -239,17 +239,17 @@ const Menu = () => {
       <div className="container mx-auto px-4 lg:px-8 mt-2">
         <div 
           style={{ backgroundImage: `url('https://images.unsplash.com/photo-1550547660-d9450f859349?q=80&w=1887&auto=format&fit=crop')` }}
-          className="bg-cover bg-center h-[380px] md:h-[450px] text-center relative overflow-hidden rounded-[2rem] shadow-xl"
+          className="bg-cover bg-center h-[200px] md:h-[380px] text-center relative overflow-hidden rounded-[2rem] shadow-xl"
         >
           {/* Gradient Mesh Overlay */}
           <div className="absolute inset-0 bg-gradient-to-b from-sky-900/70 via-black/40 to-black/60"></div>
           
           <div className="relative z-10 flex flex-col items-center justify-center h-full pt-10 px-4">
-            <span className="text-sky-300 font-bold tracking-widest text-sm uppercase mb-3 animate-fade-in-up">Taste the Difference</span>
-            <h1 className="text-4xl md:text-6xl font-black text-white mb-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+            <span className="text-sky-300 font-bold tracking-widest text-xs md:text-sm uppercase mb-1 md:mb-3 animate-fade-in-up">Taste the Difference</span>
+            <h1 className="text-3xl md:text-6xl font-black text-white mb-2 md:mb-4 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
               Thực Đơn <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-sky-300">DualeoFood</span>
             </h1>
-            <p className="text-gray-200 mt-2 text-lg max-w-xl mx-auto animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+            <p className="text-gray-200 mt-1 md:mt-2 text-sm md:text-lg max-w-xl mx-auto animate-fade-in-up hidden md:block" style={{ animationDelay: '200ms' }}>
               Tinh hoa ẩm thực hội tụ trong từng món ăn. Nóng hổi, đậm vị và ngập tràn cảm hứng.
             </p>
           </div>
@@ -349,7 +349,7 @@ const Menu = () => {
 
         {/* Product Grid */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 xl:gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 xl:gap-8">
             {Array.from({ length: 8 }).map((_, index) => <ProductCardSkeleton key={index} />)}
           </div>
         ) : products.length === 0 ? (
@@ -361,7 +361,7 @@ const Menu = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 xl:gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 xl:gap-8">
             {products.map((product, index) => (
               <ProductCard 
                 key={product._id} 

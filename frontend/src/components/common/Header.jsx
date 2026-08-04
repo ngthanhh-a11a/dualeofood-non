@@ -6,6 +6,7 @@ import { openAuthModal } from '../../redux/uiSlice'; // Import action mở popup
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig'; // Import axios và SERVER_URL
 import logoImage from '../../assets/logo.png';
 import { FaBell } from 'react-icons/fa'; // Icon chuông
+import { FiHome, FiList, FiShoppingBag, FiUser } from 'react-icons/fi'; // Icon Bottom Nav
 import { useSocket } from '../../contexts/SocketContext'; // Lắng nghe real-time
 import { formatDistanceToNow } from 'date-fns'; // Hiển thị "5 phút trước"
 import { vi } from 'date-fns/locale'; // Ngôn ngữ Tiếng Việt
@@ -203,11 +204,10 @@ const Header = () => {
         {/* ================= KHU VỰC CÔNG CỤ & TÀI KHOẢN ================= */}
         <div className="flex items-center space-x-3 sm:space-x-6">
           
-          {/* Nút Giỏ Hàng */}
-          {/* Thêm id="cart-icon" vào đây để JavaScript có thể tìm thấy */}
-          <Link to="/cart" id="cart-icon" className="relative flex items-center text-slate-700 hover:text-sky-500 transition-transform duration-300 group bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
+          {/* Nút Giỏ Hàng (Ẩn trên Mobile vì đã có Bottom Nav) */}
+          <Link to="/cart" id="cart-icon" className="hidden md:flex relative items-center text-slate-700 hover:text-sky-500 transition-transform duration-300 group bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
             <span className="text-2xl mr-1 group-hover:scale-110 transition transform">🛒</span> 
-            <span className="font-bold hidden md:inline">Giỏ hàng</span>
+            <span className="font-bold">Giỏ hàng</span>
             
             {/* Vòng tròn đỏ hiển thị số lượng món ăn trong giỏ */}
             {cartItems?.length > 0 && (
@@ -411,6 +411,43 @@ const Header = () => {
           ))}
         </nav>
       </div>
+      
+      {/* ================= BOTTOM NAVIGATION BAR (Mobile Only) ================= */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 flex justify-around items-center h-16 z-50">
+        <Link to="/" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}>
+          <FiHome size={22} />
+          <span className="text-[10px] font-bold">Trang chủ</span>
+        </Link>
+        <Link to="/menu" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/menu' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}>
+          <FiList size={22} />
+          <span className="text-[10px] font-bold">Thực đơn</span>
+        </Link>
+        <Link to="/cart" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/cart' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}>
+          <div className="relative">
+            <FiShoppingBag size={22} />
+            {cartItems?.length > 0 && (
+              <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
+                {cartItems.length}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] font-bold">Giỏ hàng</span>
+        </Link>
+        <button 
+          onClick={() => {
+            if (userInfo) {
+              navigate('/profile');
+            } else {
+              dispatch(openAuthModal());
+            }
+          }} 
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/profile' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}
+        >
+          <FiUser size={22} />
+          <span className="text-[10px] font-bold">Tài khoản</span>
+        </button>
+      </nav>
+
     </header>
   );
 };

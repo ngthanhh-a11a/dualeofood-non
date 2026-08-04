@@ -279,7 +279,7 @@ const Home = () => {
         className={`relative w-full ${banners.length > 0 ? '' : 'py-20 md:py-32'} overflow-hidden rounded-3xl mb-24 bg-gradient-to-br from-sky-100 via-blue-50 to-white transition-all duration-1000 transform ${visibleSections.banner ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'}`}
       >
         {banners.length > 0 ? (
-           <div className="relative w-full aspect-square md:aspect-[21/9] max-h-[600px]">
+           <div className="relative w-full aspect-[4/3] md:aspect-[21/9] max-h-[600px]">
               {banners.map((banner, index) => (
                  <div key={banner._id} className={`absolute inset-0 transition-opacity duration-1000 ${index === currentBannerIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
                     <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
@@ -323,11 +323,11 @@ const Home = () => {
 
           {/* Main Content */}
           <div className="container mx-auto px-6 relative z-10 text-center">
-            <h1 className="text-4xl md:text-6xl lg:text-7xl font-black text-amber-500 tracking-tight drop-shadow-sm mb-6 animate-fade-in-up" style={{animationDelay: '100ms'}}
+            <h1 className="text-3xl md:text-6xl lg:text-7xl font-black text-amber-500 tracking-tight drop-shadow-sm mb-4 md:mb-6 animate-fade-in-up" style={{animationDelay: '100ms'}}
             >
               Nếm Thử Sự Khác Biệt, <br/> Cảm Nhận <span className="text-sky-500">Niềm Vui</span>.
             </h1>
-            <p className="text-gray-600 text-lg md:text-xl max-w-2xl mx-auto mb-10 animate-fade-in-up" style={{animationDelay: '200ms'}}>
+            <p className="text-gray-600 text-base md:text-xl max-w-2xl mx-auto mb-6 md:mb-10 animate-fade-in-up" style={{animationDelay: '200ms'}}>
               Trải nghiệm nghệ thuật hương vị với thịt bò nướng mọng nước, gà rán giòn tan và những nguyên liệu tươi ngon nhất, tất cả được chế biến bằng cả đam mê.
             </p>
             <Link 
@@ -520,11 +520,11 @@ const Home = () => {
                 {searchTerm ? `Không tìm thấy món "${searchTerm}".` : 'Chưa có món ăn nào trong hệ thống.'}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8">
                 {filteredProducts.map((product, index) => (
                   <div 
                     key={product._id}
-                    className={`product-card bg-white p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 border border-slate-100/80 flex flex-col items-center group transform ${
+                    className={`product-card bg-white p-3 md:p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 border border-slate-100/80 flex flex-col items-center group transform ${
                       visibleSections.menuItems ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'
                     }`}
                     style={{ transitionDelay: `${index * 75}ms` }}
@@ -538,7 +538,7 @@ const Home = () => {
                       )}
                     </div>
                     
-                    <h3 className="text-lg font-bold text-slate-800 text-center mb-2 group-hover:text-sky-500 transition line-clamp-2 min-h-[56px] flex items-center justify-center">
+                    <h3 className="text-[0.9rem] md:text-lg font-bold text-slate-800 text-center mb-1 md:mb-2 group-hover:text-sky-500 transition line-clamp-2 min-h-[40px] md:min-h-[56px] flex items-center justify-center">
                       {product.name}
                     </h3>
                     
@@ -549,19 +549,19 @@ const Home = () => {
                     </div>
 
                     <div className="text-center mb-5">
-                      <span className="text-2xl font-black text-sky-500">{product.price?.toLocaleString('vi-VN') || '0'}đ</span>
+                      <span className="text-lg md:text-2xl font-black text-sky-500">{product.price?.toLocaleString('vi-VN') || '0'}đ</span>
                     </div>
 
                     <div className="w-full flex items-stretch gap-2 mt-auto">
                       <button 
                         onClick={(e) => handleAddToCart(product, e)}
-                        className="flex-1 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 transition duration-300 text-sm"
+                        className="flex-1 bg-sky-500 text-white font-bold py-2 md:py-3 rounded-xl hover:bg-sky-600 transition duration-300 text-xs md:text-sm"
                       >
                         Thêm vào giỏ
                       </button>
                       <button
                         onClick={() => handleOpenReviewModal(product)}
-                        className="flex items-center justify-center bg-white border-2 border-sky-500 text-sky-500 font-bold p-3 rounded-xl hover:bg-sky-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md"
+                        className="flex items-center justify-center bg-white border-2 border-sky-500 text-sky-500 font-bold px-2 py-2 md:p-3 rounded-xl hover:bg-sky-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md"
                         title="Viết đánh giá"
                       >
                         <FiEdit size={20} />
