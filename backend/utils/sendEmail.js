@@ -3,7 +3,8 @@ const nodemailer = require('nodemailer');
 const sendEmail = async (options) => {
   // 1. Khởi tạo transporter với cấu hình linh hoạt (Hỗ trợ Gmail, Brevo, SendGrid...)
   const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
+    service: (process.env.EMAIL_HOST || '').includes('gmail') ? 'gmail' : undefined,
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: process.env.EMAIL_PORT || 587,
     secure: process.env.EMAIL_PORT == 465, // true nếu dùng cổng 465, false nếu dùng cổng 587
     auth: {
