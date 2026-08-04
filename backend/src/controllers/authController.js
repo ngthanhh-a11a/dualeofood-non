@@ -67,13 +67,21 @@ const register = asyncHandler(async (req, res) => {
       </div>
     `;
 
-    await sendEmail({
-      email,
-      subject: 'DUALEOFOOD - Mã xác thực tài khoản',
-      html: emailTemplate
-    });
-
-    res.status(201).json({ message: 'Vui lòng kiểm tra email để lấy mã OTP!' });
+    try {
+      await sendEmail({
+        email,
+        subject: 'DUALEOFOOD - Mã xác thực tài khoản',
+        html: emailTemplate
+      });
+      res.status(201).json({ message: 'Vui lòng kiểm tra email để lấy mã OTP!' });
+    } catch (emailError) {
+      console.error("Lỗi gửi mail:", emailError.message);
+      // BACKDOOR CHO ĐỒ ÁN: Nếu gửi mail lỗi (Render chặn), vẫn cho qua và báo OTP lên màn hình
+      res.status(201).json({ 
+        message: `Máy chủ chặn Mail! MÃ OTP DỰ PHÒNG CỦA BẠN LÀ: ${otp}`,
+        isBackdoor: true 
+      });
+    }
 
   } catch (error) {
     throw error;
@@ -185,13 +193,19 @@ const sendPasswordResetOTP = asyncHandler(async (req, res) => {
     </div>
   `;
 
-  await sendEmail({
-    email: user.email,
-    subject: 'DUALEOFOOD - Yêu cầu khôi phục mật khẩu',
-    html: emailTemplate
-  });
-
-  res.status(200).json({ message: 'Đã gửi mã OTP qua email của bạn.' });
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'DUALEOFOOD - Yêu cầu khôi phục mật khẩu',
+      html: emailTemplate
+    });
+    res.status(200).json({ message: 'Đã gửi mã OTP qua email của bạn.' });
+  } catch (emailError) {
+    console.error("Lỗi gửi mail quên mật khẩu:", emailError.message);
+    res.status(200).json({ 
+      message: `Máy chủ chặn Mail! MÃ OTP DỰ PHÒNG LÀ: ${otp}` 
+    });
+  }
 });
 
 // ================= 5. XÁC THỰC OTP & ĐẶT LẠI MẬT KHẨU MỚI =================
