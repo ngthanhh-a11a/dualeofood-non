@@ -167,22 +167,7 @@ const CategoryStyles = () => <style>{styles}</style>;
 // --- KẾT THÚC PHẦN CSS ---
 
 
-// Giả định bạn có một file api.js để cấu hình axios instance
-const api = axios.create({
-    baseURL: 'http://localhost:5000/api', // Điều chỉnh cho phù hợp
-    headers: {
-        'Content-Type': 'application/json',
-    },
-});
-
-// Thêm interceptor để tự động gắn token vào mỗi request
-api.interceptors.request.use(config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-});
+import api from '../../utils/axiosConfig';
 
 const AdminCategories = () => {
     const [categories, setCategories] = useState([]);
