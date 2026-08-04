@@ -15,28 +15,40 @@ const register = asyncHandler(async (req, res) => {
   const { name, email, password, phone, address } = req.body;
 
   try {
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ message: 'Email này đã được sử dụng!' });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
+    let user = await User.findOne({ email });
+    
     // Tạo mã OTP 6 số và đặt hạn 10 phút
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      phone,
-      address,
-      otp,
-      otpExpires,
-      isVerified: false // Tài khoản mới tạo ở trạng thái chưa xác thực
-    });
+    if (user) {
+      if (user.isVerified) {
+        return res.status(400).json({ message: 'Email này đã được đăng ký và kích hoạt!' });
+      } else {
+        // Tài khoản tồn tại nhưng chưa kích hoạt -> Cập nhật thông tin và gửi lại OTP mới
+        user.name = name;
+        user.password = hashedPassword;
+        user.phone = phone;
+        user.address = address;
+        user.otp = otp;
+        user.otpExpires = otpExpires;
+        await user.save();
+      }
+    } else {
+      await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        phone,
+        address,
+        otp,
+        otpExpires,
+        isVerified: false // Tài khoản mới tạo ở trạng thái chưa xác thực
+      });
+    }
 
     // Mẫu thư HTML gửi cho khách
     const emailTemplate = `
