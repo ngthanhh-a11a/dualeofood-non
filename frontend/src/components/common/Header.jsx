@@ -160,6 +160,12 @@ const Header = () => {
     { path: '/contact', text: 'Liên hệ' },
   ];
 
+  // Hàm điều hướng đáng tin cậy trên Mobile
+  const handleMobileNav = (path) => {
+    setIsMobileMenuOpen(false);
+    navigate(path);
+  };
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-50 font-sans">
       {/* Thêm định nghĩa keyframes cho hiệu ứng shake, có thể chuyển vào file CSS chung */}
@@ -379,12 +385,12 @@ const Header = () => {
                 </div>
               </div>
               <div className="flex flex-col space-y-1">
-                {userInfo.role === 'admin' && <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)} className="font-semibold text-gray-700 p-3 rounded-xl hover:bg-orange-50 hover:text-orange-500 transition">⚙️ Quản trị</Link>}
-                <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)} className="font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">👤 Hồ sơ cá nhân</Link>
-                <Link to="/my-addresses" onClick={() => setIsMobileMenuOpen(false)} className="font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📍 Địa chỉ của tôi</Link>
-                <Link to="/my-orders" onClick={() => setIsMobileMenuOpen(false)} className="font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📦 Đơn hàng của tôi</Link>
-                <Link to="/wallet" onClick={() => setIsMobileMenuOpen(false)} className="font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">🎟️ Kho Voucher</Link>
-                <Link to="/my-reviews" onClick={() => setIsMobileMenuOpen(false)} className="font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📝 Đánh giá của tôi</Link>
+                {userInfo.role === 'admin' && <button onClick={() => handleMobileNav('/admin')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-orange-50 hover:text-orange-500 transition">⚙️ Quản trị</button>}
+                <button onClick={() => handleMobileNav('/profile')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">👤 Hồ sơ cá nhân</button>
+                <button onClick={() => handleMobileNav('/my-addresses')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📍 Địa chỉ của tôi</button>
+                <button onClick={() => handleMobileNav('/my-orders')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📦 Đơn hàng của tôi</button>
+                <button onClick={() => handleMobileNav('/wallet')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">🎟️ Kho Voucher</button>
+                <button onClick={() => handleMobileNav('/my-reviews')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📝 Đánh giá của tôi</button>
                 <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="w-full text-left font-semibold text-red-500 p-3 rounded-xl hover:bg-red-50 transition">Đăng xuất</button>
               </div>
             </div>
@@ -398,16 +404,15 @@ const Header = () => {
         {/* Khu vực điều hướng chính trên mobile */}
         <nav className="flex flex-col p-5 space-y-2">
           {navLinks.map((link) => (
-            <Link
+            <button
               key={link.path}
-              to={link.path}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`font-bold text-lg p-4 rounded-xl transition-colors duration-200 ${
+              onClick={() => handleMobileNav(link.path)}
+              className={`w-full text-left font-bold text-lg p-4 rounded-xl transition-colors duration-200 ${
                 location.pathname === link.path ? 'bg-sky-100 text-sky-600' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-500'
               }`}
             >
               {link.text}
-            </Link>
+            </button>
           ))}
         </nav>
       </div>
