@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Article = require('../models/Article');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
@@ -337,6 +338,50 @@ const getMyReviews = asyncHandler(async (req, res) => {
     res.json({ reviews, currentPage: page, totalPages: Math.ceil(totalReviews / limit) });
 });
 
+// @desc    Get article comments made by the current user
+// @route   GET /api/users/my-article-comments
+// @access  Private
+const getMyArticleComments = asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = 5; // 5 comments per page
+    const skip = (page - 1) * limit;
+    const userId = new mongoose.Types.ObjectId(req.user.id);
+
+    // Aggregation to get total count for pagination
+    const totalCommentsCount = await Article.aggregate([
+        { $unwind: '$comments' },
+        { $match: { 'comments.user': userId } },
+        { $count: 'total' }
+    ]);
+    const totalComments = totalCommentsCount.length > 0 ? totalCommentsCount[0].total : 0;
+
+    // Aggregation to get paginated comments
+    const comments = await Article.aggregate([
+        // Match articles that contain a comment by the user
+        { $match: { 'comments.user': userId } },
+        // Unwind the comments array
+        { $unwind: '$comments' },
+        // Match only the specific comments by the user
+        { $match: { 'comments.user': userId } },
+        // Sort by comment date descending (newest first)
+        { $sort: { 'comments.createdAt': -1 } },
+        // Pagination
+        { $skip: skip },
+        { $limit: limit },
+        // Project the desired fields
+        {
+            $project: {
+                _id: '$comments._id',
+                content: '$comments.content',
+                createdAt: '$comments.createdAt',
+                article: { _id: '$_id', title: '$title', slug: '$slug', thumbnail: '$thumbnail' }
+            }
+        }
+    ]);
+
+    res.json({ comments, currentPage: page, totalPages: Math.ceil(totalComments / limit) });
+});
+
 // @desc    Get user registration statistics
 // @route   GET /api/users/stats
 // @access  Private/Admin
@@ -396,4 +441,4 @@ const getUserById = asyncHandler(async (req, res) => {
     }
 });
 
-module.exports = { getAllUsers, deleteUser, updateUserRole, getProfile, updateProfile, changePassword, updateAvatar, getMyReviews, getUserStats, addAddress, updateAddress, deleteAddress, setDefaultAddress, listAllUsers, getUserById };
+module.exports = { getAllUsers, deleteUser, updateUserRole, getProfile, updateProfile, changePassword, updateAvatar, getMyReviews, getMyArticleComments, getUserStats, addAddress, updateAddress, deleteAddress, setDefaultAddress, listAllUsers, getUserById };

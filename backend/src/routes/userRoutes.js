@@ -11,6 +11,7 @@ const {
     changePassword,
     updateAvatar,
     getMyReviews,
+    getMyArticleComments,
     getUserStats,
     addAddress,
     updateAddress,
@@ -48,6 +49,7 @@ router.put('/profile', verifyToken, updateProfile);
 router.put('/profile/avatar', verifyToken, upload.single('avatar'), updateAvatar);
 router.put('/change-password', verifyToken, changePassword);
 router.get('/my-reviews', verifyToken, getMyReviews);
+router.get('/my-article-comments', verifyToken, getMyArticleComments);
 
 // === CÁC ROUTE CÓ CHỨA PARAM (Nên để dưới cùng để tránh ghi đè route tĩnh) ===
 router.get('/:id', verifyToken, authorizeRoles('admin', 'staff'), getUserById);
