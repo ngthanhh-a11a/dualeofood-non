@@ -12,45 +12,45 @@ import { FiSearch, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
 // Component Card sản phẩm
 const ProductCard = ({ product, onAddToCart, onProductClick, delay }) => (
   <div 
-    className="product-card group bg-white rounded-[2rem] p-3 md:p-4 shadow-sm hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] transition-shadow duration-500 border border-gray-100/50 flex flex-col opacity-0 animate-fade-in-up"
+    className="product-card group bg-white rounded-2xl md:rounded-[2rem] p-3 md:p-4 shadow-sm hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] transition-shadow duration-300 md:duration-500 border border-gray-100/50 flex flex-row md:flex-col items-center md:items-stretch gap-4 md:gap-0 opacity-0 animate-fade-in-up"
     style={{ animationDelay: `${delay}ms` }}
   >
     <div 
-      className="relative w-full aspect-square rounded-[1.5rem] mb-4 bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer"
+      className="relative w-24 h-24 md:w-full md:h-auto md:aspect-square flex-shrink-0 rounded-xl md:rounded-[1.5rem] md:mb-4 bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer"
       onClick={() => onProductClick(product._id)}
     >
       {product.image ? (
-        <img src={`${getImageUrl(product.image)}`} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" />
+        <img src={`${getImageUrl(product.image)}`} alt={product.name} className="w-full h-full object-cover transition-transform duration-700 ease-out md:group-hover:scale-110" />
       ) : (
-        <span className="text-6xl">🍔</span>
+        <span className="text-4xl md:text-6xl">🍔</span>
       )}
       {/* Overlay gradient tinh tế khi hover */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 hidden md:block"></div>
     </div>
     
-    <div className="flex-1 flex flex-col px-2">
+    <div className="flex-1 flex flex-col px-0 md:px-2 min-w-0">
       <h3 
-        className="text-[0.9rem] md:text-[1.1rem] font-bold text-slate-800 mb-1 group-hover:text-orange-500 transition-colors line-clamp-2 cursor-pointer leading-tight"
+        className="text-[1rem] md:text-[1.1rem] font-bold text-slate-800 mb-1 group-hover:text-orange-500 transition-colors truncate md:whitespace-normal md:line-clamp-2 cursor-pointer leading-tight"
         onClick={() => onProductClick(product._id)}
       >
         {product.name}
       </h3>
       
-      <div className="flex items-center gap-1.5 mb-4 text-sm mt-1">
-        <StarRating rating={product.averageRating} size={14} />
-        <span className="text-gray-400 font-medium text-xs">({product.numReviews || 0})</span>
+      <div className="flex items-center gap-1.5 mb-1.5 md:mb-4 text-sm md:mt-1">
+        <StarRating rating={product.averageRating} size={12} />
+        <span className="text-gray-400 font-medium text-[11px] md:text-xs">({product.numReviews || 0})</span>
       </div>
 
-      <div className="flex items-center justify-between mt-auto pt-2">
-        <span className="text-lg md:text-xl font-black text-slate-800">
-          {product.price?.toLocaleString('vi-VN') || '0'}<span className="text-xs md:text-sm font-bold text-orange-500 ml-1">đ</span>
+      <div className="flex items-center justify-between mt-auto pt-1 md:pt-2">
+        <span className="text-[1.1rem] md:text-xl font-black text-slate-800">
+          {product.price?.toLocaleString('vi-VN') || '0'}<span className="text-[10px] md:text-sm font-bold text-orange-500 ml-1">đ</span>
         </span>
         <button 
           onClick={(e) => onAddToCart(product, e)}
-          className="w-9 h-9 md:w-12 md:h-12 shrink-0 bg-gradient-to-r from-sky-400 to-sky-600 text-white rounded-xl md:rounded-2xl flex items-center justify-center hover:shadow-lg hover:shadow-sky-500/30 hover:-translate-y-1 transition-all duration-300 group/btn relative overflow-hidden"
+          className="w-8 h-8 md:w-12 md:h-12 shrink-0 bg-gradient-to-r from-sky-400 to-sky-600 text-white rounded-lg md:rounded-2xl flex items-center justify-center hover:shadow-lg hover:shadow-sky-500/30 md:hover:-translate-y-1 transition-all duration-300 group/btn relative overflow-hidden shadow-sm"
         >
-           <FiShoppingBag className="w-5 h-5 relative z-10" />
-           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover/btn:translate-y-0 transition-transform duration-300"></div>
+           <FiShoppingBag className="w-4 h-4 md:w-5 md:h-5 relative z-10" />
+           <div className="absolute inset-0 bg-white/20 translate-y-full md:group-hover/btn:translate-y-0 transition-transform duration-300 hidden md:block"></div>
         </button>
       </div>
     </div>
@@ -59,13 +59,15 @@ const ProductCard = ({ product, onAddToCart, onProductClick, delay }) => (
 
 // Component Skeleton Loading
 const ProductCardSkeleton = () => (
-  <div className="flex flex-col p-4 bg-white rounded-[2rem] shadow-sm border border-gray-100">
-      <div className="w-full aspect-square bg-gray-100 rounded-[1.5rem] mb-4 animate-pulse"></div>
-      <div className="h-5 bg-gray-100 rounded-lg w-3/4 mb-3 animate-pulse"></div>
-      <div className="h-4 bg-gray-100 rounded-lg w-1/3 mb-6 animate-pulse"></div>
-      <div className="flex justify-between items-center">
-         <div className="h-6 bg-gray-100 rounded-lg w-1/3 animate-pulse"></div>
-         <div className="w-12 h-12 bg-gray-100 rounded-2xl animate-pulse"></div>
+  <div className="flex flex-row md:flex-col gap-4 md:gap-0 p-3 md:p-4 bg-white rounded-2xl md:rounded-[2rem] shadow-sm border border-gray-100">
+      <div className="w-24 h-24 md:w-full md:h-auto md:aspect-square flex-shrink-0 bg-gray-100 rounded-xl md:rounded-[1.5rem] md:mb-4 animate-pulse"></div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="h-5 bg-gray-100 rounded-lg w-3/4 mb-3 animate-pulse"></div>
+        <div className="h-4 bg-gray-100 rounded-lg w-1/3 mb-4 md:mb-6 animate-pulse"></div>
+        <div className="flex justify-between items-center mt-auto">
+           <div className="h-6 bg-gray-100 rounded-lg w-1/3 animate-pulse"></div>
+           <div className="w-8 h-8 md:w-12 md:h-12 bg-gray-100 rounded-lg md:rounded-2xl animate-pulse"></div>
+        </div>
       </div>
   </div>
 );
@@ -349,7 +351,7 @@ const Menu = () => {
 
         {/* Product Grid */}
         {loading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 xl:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 xl:gap-8">
             {Array.from({ length: 8 }).map((_, index) => <ProductCardSkeleton key={index} />)}
           </div>
         ) : products.length === 0 ? (
@@ -361,7 +363,7 @@ const Menu = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 xl:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6 xl:gap-8">
             {products.map((product, index) => (
               <ProductCard 
                 key={product._id} 

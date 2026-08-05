@@ -16,11 +16,11 @@ const register = asyncHandler(async (req, res) => {
 
   try {
     let user = await User.findOne({ email });
-    
+
     // Tạo mã OTP 6 số và đặt hạn 10 phút
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-    
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -67,21 +67,13 @@ const register = asyncHandler(async (req, res) => {
       </div>
     `;
 
-    try {
-      await sendEmail({
-        email,
-        subject: 'DUALEOFOOD - Mã xác thực tài khoản',
-        html: emailTemplate
-      });
-      res.status(201).json({ message: 'Vui lòng kiểm tra email để lấy mã OTP!' });
-    } catch (emailError) {
-      console.error("Lỗi gửi mail:", emailError.message);
-      // BACKDOOR CHO ĐỒ ÁN: Nếu gửi mail lỗi (Render chặn), vẫn cho qua và báo OTP lên màn hình
-      res.status(201).json({ 
-        message: `Máy chủ chặn Mail! MÃ OTP DỰ PHÒNG CỦA BẠN LÀ: ${otp}`,
-        isBackdoor: true 
-      });
-    }
+    await sendEmail({
+      email,
+      subject: 'DUALEOFOOD - Mã xác thực tài khoản',
+      html: emailTemplate
+    });
+
+    res.status(201).json({ message: 'Vui lòng kiểm tra email để lấy mã OTP!' });
 
   } catch (error) {
     throw error;
@@ -145,7 +137,7 @@ const login = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       message: 'Đăng nhập thành công!',
-      user: { 
+      user: {
         _id: user._id,
         name: user.name,
         email: user.email,
@@ -193,19 +185,13 @@ const sendPasswordResetOTP = asyncHandler(async (req, res) => {
     </div>
   `;
 
-  try {
-    await sendEmail({
-      email: user.email,
-      subject: 'DUALEOFOOD - Yêu cầu khôi phục mật khẩu',
-      html: emailTemplate
-    });
-    res.status(200).json({ message: 'Đã gửi mã OTP qua email của bạn.' });
-  } catch (emailError) {
-    console.error("Lỗi gửi mail quên mật khẩu:", emailError.message);
-    res.status(200).json({ 
-      message: `Máy chủ chặn Mail! MÃ OTP DỰ PHÒNG LÀ: ${otp}` 
-    });
-  }
+  await sendEmail({
+    email: user.email,
+    subject: 'DUALEOFOOD - Yêu cầu khôi phục mật khẩu',
+    html: emailTemplate
+  });
+
+  res.status(200).json({ message: 'Đã gửi mã OTP qua email của bạn.' });
 });
 
 // ================= 5. XÁC THỰC OTP & ĐẶT LẠI MẬT KHẨU MỚI =================

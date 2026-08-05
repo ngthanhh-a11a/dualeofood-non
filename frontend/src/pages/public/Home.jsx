@@ -520,52 +520,73 @@ const Home = () => {
                 {searchTerm ? `Không tìm thấy món "${searchTerm}".` : 'Chưa có món ăn nào trong hệ thống.'}
               </div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-8">
                 {filteredProducts.map((product, index) => (
                   <div 
                     key={product._id}
-                    className={`product-card bg-white p-3 md:p-5 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)] hover:-translate-y-2 transition-all duration-500 border border-slate-100/80 flex flex-col items-center group transform ${
-                      visibleSections.menuItems ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'
+                    className={`product-card bg-white p-3 md:p-5 rounded-2xl md:rounded-3xl shadow-sm md:shadow-[0_4px_16px_rgba(0,0,0,0.05)] md:hover:shadow-[0_8px_24px_rgba(0,0,0,0.1)] md:hover:-translate-y-2 transition-all duration-300 md:duration-500 border border-slate-100/80 flex flex-row md:flex-col items-center md:items-stretch gap-4 md:gap-0 group transform ${
+                      visibleSections.menuItems ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 md:translate-y-16'
                     }`}
-                    style={{ transitionDelay: `${index * 75}ms` }}
+                    style={{ transitionDelay: `${index * 50}ms` }}
                   >
                     
-                    <div className="w-full aspect-square bg-slate-50 rounded-2xl mb-4 flex items-center justify-center overflow-hidden">
+                    <div className="w-24 h-24 md:w-full md:h-auto md:aspect-square flex-shrink-0 bg-slate-50 rounded-xl md:rounded-2xl md:mb-4 flex items-center justify-center overflow-hidden relative">
                       {product.image ? (
-                        <img src={`${getImageUrl(product.image)}`} alt={product.name} className="product-image w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                        <img src={`${getImageUrl(product.image)}`} alt={product.name} className="product-image w-full h-full object-cover transition-transform duration-500 md:group-hover:scale-110" />
                       ) : (
-                        <span className="text-6xl">🍔</span>
+                        <span className="text-4xl md:text-6xl">🍔</span>
                       )}
                     </div>
                     
-                    <h3 className="text-[0.9rem] md:text-lg font-bold text-slate-800 text-center mb-1 md:mb-2 group-hover:text-sky-500 transition line-clamp-2 min-h-[40px] md:min-h-[56px] flex items-center justify-center">
-                      {product.name}
-                    </h3>
-                    
-                    {/* Hiển thị sao và số lượt đánh giá */}
-                    <div className="flex items-center justify-center gap-2 mb-2 text-sm">
-                      <StarRating rating={product.averageRating} />
-                      <span className="text-gray-500">({product.numReviews || 0})</span>
-                    </div>
+                    <div className="flex flex-col flex-1 h-full py-1 md:py-0 min-w-0">
+                      <h3 className="text-[1rem] md:text-lg font-bold text-slate-800 md:text-center mb-1 md:mb-2 group-hover:text-sky-500 transition truncate md:whitespace-normal md:line-clamp-2 md:min-h-[56px] flex items-center md:justify-center">
+                        {product.name}
+                      </h3>
+                      
+                      {/* Hiển thị sao và số lượt đánh giá */}
+                      <div className="flex items-center md:justify-center gap-1.5 mb-1.5 md:mb-2 text-xs md:text-sm">
+                        <StarRating rating={product.averageRating} size={14} />
+                        <span className="text-gray-500">({product.numReviews || 0})</span>
+                      </div>
 
-                    <div className="text-center mb-5">
-                      <span className="text-lg md:text-2xl font-black text-sky-500">{product.price?.toLocaleString('vi-VN') || '0'}đ</span>
-                    </div>
+                      <div className="mb-2 md:mb-5 mt-auto md:mt-0 flex items-center md:block">
+                        <span className="text-[1.1rem] md:text-2xl font-black text-sky-500">{product.price?.toLocaleString('vi-VN') || '0'}đ</span>
+                      </div>
 
-                    <div className="w-full flex items-stretch gap-2 mt-auto">
-                      <button 
-                        onClick={(e) => handleAddToCart(product, e)}
-                        className="flex-1 bg-sky-500 text-white font-bold py-2 md:py-3 rounded-xl hover:bg-sky-600 transition duration-300 text-xs md:text-sm"
-                      >
-                        Thêm vào giỏ
-                      </button>
-                      <button
-                        onClick={() => handleOpenReviewModal(product)}
-                        className="flex items-center justify-center bg-white border-2 border-sky-500 text-sky-500 font-bold px-2 py-2 md:p-3 rounded-xl hover:bg-sky-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md"
-                        title="Viết đánh giá"
-                      >
-                        <FiEdit size={20} />
-                      </button>
+                      {/* Desktop Buttons Layout */}
+                      <div className="w-full items-stretch gap-2 mt-auto hidden md:flex">
+                        <button 
+                          onClick={(e) => handleAddToCart(product, e)}
+                          className="flex-1 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 transition duration-300 text-sm"
+                        >
+                          Thêm vào giỏ
+                        </button>
+                        <button
+                          onClick={() => handleOpenReviewModal(product)}
+                          className="flex items-center justify-center bg-white border-2 border-sky-500 text-sky-500 font-bold p-3 rounded-xl hover:bg-sky-50 transition-all duration-300 transform hover:scale-105 hover:shadow-md"
+                          title="Viết đánh giá"
+                        >
+                          <FiEdit size={20} />
+                        </button>
+                      </div>
+
+                      {/* Mobile Buttons Layout */}
+                      <div className="w-full flex items-center gap-2 mt-auto md:hidden">
+                        <button 
+                          onClick={(e) => handleAddToCart(product, e)}
+                          className="flex-1 bg-sky-500 text-white font-bold py-2 rounded-lg active:bg-sky-600 transition text-xs flex items-center justify-center gap-1 shadow-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                          Thêm
+                        </button>
+                        <button
+                          onClick={() => handleOpenReviewModal(product)}
+                          className="flex items-center justify-center bg-white border border-sky-500 text-sky-500 font-bold p-2 rounded-lg active:bg-sky-50 transition"
+                          title="Viết đánh giá"
+                        >
+                          <FiEdit size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
