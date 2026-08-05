@@ -345,7 +345,7 @@ const getMyArticleComments = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = 5; 
     const skip = (page - 1) * limit;
-    const userId = req.user._id;
+    const userId = req.user.id; // Lấy id từ token (dạng chuỗi)
 
     // Find articles where user either clapped or commented
     const query = {
