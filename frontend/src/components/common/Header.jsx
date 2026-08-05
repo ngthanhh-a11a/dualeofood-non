@@ -353,7 +353,7 @@ const Header = () => {
       ></div>
 
       {/* Bảng menu */}
-      <div className={`fixed top-0 right-0 h-full w-4/5 max-w-sm bg-white z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+      <div className={`fixed top-0 right-0 h-full w-4/5 max-w-sm bg-white z-50 transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="flex justify-between items-center p-5 border-b border-slate-100">
           <h2 className="font-black text-xl text-sky-500">MENU</h2>
           <button onClick={() => setIsMobileMenuOpen(false)} aria-label="Đóng menu">

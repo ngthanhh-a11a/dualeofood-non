@@ -110,7 +110,7 @@ const CustomerChatWidget = () => {
   if (isHidden) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-50">
       {/* Nút Chat hiển thị khi đóng */}
       {!isOpen && (
         <button 
@@ -123,7 +123,7 @@ const CustomerChatWidget = () => {
 
       {/* Cửa sổ Chat */}
       {isOpen && (
-        <div className="bg-white rounded-2xl shadow-2xl w-[350px] h-[500px] flex flex-col overflow-hidden border border-gray-100 transition-all duration-300 transform origin-bottom-right">
+        <div className="bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] md:w-[350px] h-[60vh] md:h-[500px] flex flex-col overflow-hidden border border-gray-100 transition-all duration-300 transform origin-bottom-right">
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-orange-400 p-4 text-white flex justify-between items-center shadow-md">
             <div>
