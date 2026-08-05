@@ -338,48 +338,58 @@ const getMyReviews = asyncHandler(async (req, res) => {
     res.json({ reviews, currentPage: page, totalPages: Math.ceil(totalReviews / limit) });
 });
 
-// @desc    Get article comments made by the current user
+// @desc    Get article interactions (comments and likes) made by the current user
 // @route   GET /api/users/my-article-comments
 // @access  Private
 const getMyArticleComments = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
-    const limit = 5; // 5 comments per page
+    const limit = 5; 
     const skip = (page - 1) * limit;
-    const userId = new mongoose.Types.ObjectId(req.user.id);
+    const userId = req.user._id;
 
-    // Aggregation to get total count for pagination
-    const totalCommentsCount = await Article.aggregate([
-        { $unwind: '$comments' },
-        { $match: { 'comments.user': userId } },
-        { $count: 'total' }
-    ]);
-    const totalComments = totalCommentsCount.length > 0 ? totalCommentsCount[0].total : 0;
+    // Find articles where user either clapped or commented
+    const query = {
+        $or: [
+            { clappedBy: userId },
+            { 'comments.user': userId }
+        ]
+    };
 
-    // Aggregation to get paginated comments
-    const comments = await Article.aggregate([
-        // Match articles that contain a comment by the user
-        { $match: { 'comments.user': userId } },
-        // Unwind the comments array
-        { $unwind: '$comments' },
-        // Match only the specific comments by the user
-        { $match: { 'comments.user': userId } },
-        // Sort by comment date descending (newest first)
-        { $sort: { 'comments.createdAt': -1 } },
-        // Pagination
-        { $skip: skip },
-        { $limit: limit },
-        // Project the desired fields
-        {
-            $project: {
-                _id: '$comments._id',
-                content: '$comments.content',
-                createdAt: '$comments.createdAt',
-                article: { _id: '$_id', title: '$title', slug: '$slug', thumbnail: '$thumbnail' }
-            }
+    const totalInteractions = await Article.countDocuments(query);
+    const articles = await Article.find(query)
+                                  .sort({ updatedAt: -1 })
+                                  .skip(skip)
+                                  .limit(limit);
+
+    // Format the response for the frontend
+    const interactions = articles.map(article => {
+        const userComments = article.comments.filter(c => c.user.toString() === userId.toString());
+        const hasCommented = userComments.length > 0;
+        const hasClapped = article.clappedBy.some(id => id.toString() === userId.toString());
+
+        let content = '';
+        if (hasCommented && hasClapped) {
+            content = `Đã thích và bình luận: "${userComments[userComments.length - 1].content}"`;
+        } else if (hasCommented) {
+            content = `Đã bình luận: "${userComments[userComments.length - 1].content}"`;
+        } else if (hasClapped) {
+            content = `Đã thích bài viết này.`;
         }
-    ]);
 
-    res.json({ comments, currentPage: page, totalPages: Math.ceil(totalComments / limit) });
+        return {
+            _id: article._id, 
+            content: content,
+            createdAt: hasCommented ? userComments[userComments.length - 1].createdAt : article.updatedAt,
+            article: {
+                _id: article._id,
+                title: article.title,
+                slug: article.slug,
+                thumbnail: article.thumbnail
+            }
+        };
+    });
+
+    res.json({ comments: interactions, currentPage: page, totalPages: Math.ceil(totalInteractions / limit) });
 });
 
 // @desc    Get user registration statistics
