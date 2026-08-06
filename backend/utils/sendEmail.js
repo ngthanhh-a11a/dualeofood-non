@@ -10,6 +10,9 @@ const sendEmail = async (options) => {
       user: process.env.EMAIL_USER, 
       pass: process.env.EMAIL_PASS, 
     },
+    connectionTimeout: 10000, // Timeout kết nối: 10 giây
+    greetingTimeout: 10000,   // Timeout chờ server phản hồi: 10 giây
+    socketTimeout: 10000,     // Timeout socket: 10 giây
   });
 
   // 2. Thiết lập nội dung email
@@ -22,11 +25,13 @@ const sendEmail = async (options) => {
 
   // 3. Gửi email với log chi tiết
   try {
+    console.log(`📧 Đang gửi email tới: ${options.email} qua ${process.env.EMAIL_HOST}:${process.env.EMAIL_PORT}`);
     const info = await transporter.sendMail(mailOptions);
     console.log(`✅ Email đã gửi thành công tới: ${options.email} | MessageId: ${info.messageId}`);
     return info;
   } catch (error) {
     console.error(`❌ Lỗi gửi email tới ${options.email}:`, error.message);
+    console.error(`❌ Chi tiết: HOST=${process.env.EMAIL_HOST}, PORT=${process.env.EMAIL_PORT}, USER=${process.env.EMAIL_USER}`);
     throw new Error(`Không thể gửi email: ${error.message}`);
   }
 };
