@@ -242,9 +242,30 @@ const AdminCoupons = () => {
                     {new Date(coupon.expiryDate).toLocaleString('vi-VN')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${coupon.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {coupon.isActive ? 'Hoạt động' : 'Vô hiệu'}
-                    </span>
+                    {(() => {
+                        const isExpired = new Date(coupon.expiryDate) < new Date();
+                        const isMaxUsage = coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit;
+                        
+                        if (isExpired) {
+                            return (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                    Đã hết hạn
+                                </span>
+                            );
+                        }
+                        if (isMaxUsage) {
+                            return (
+                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                    Hết lượt dùng
+                                </span>
+                            );
+                        }
+                        return (
+                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${coupon.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                {coupon.isActive ? 'Hoạt động' : 'Vô hiệu'}
+                            </span>
+                        );
+                    })()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button onClick={() => handleOpenEditModal(coupon)} className="text-sky-600 hover:text-sky-900 mr-4"><FiEdit size={18} /></button>
