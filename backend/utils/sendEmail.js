@@ -1,37 +1,46 @@
-const nodemailer = require('nodemailer');
-
 const sendEmail = async (options) => {
-  // 1. Khởi tạo transporter (Hỗ trợ Brevo, SendGrid, Gmail...)
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
-    port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: process.env.EMAIL_PORT == 465, // true nếu dùng cổng 465, false nếu dùng cổng 587
-    auth: {
-      user: process.env.EMAIL_USER, 
-      pass: process.env.EMAIL_PASS, 
-    },
-    connectionTimeout: 10000, // Timeout kết nối: 10 giây
-    greetingTimeout: 10000,   // Timeout chờ server phản hồi: 10 giây
-    socketTimeout: 10000,     // Timeout socket: 10 giây
-  });
+  // Sử dụng Brevo HTTP API thay vì SMTP (vì Render chặn SMTP port 587/465)
+  const apiKey = process.env.BREVO_API_KEY;
 
-  // 2. Thiết lập nội dung email
-  const mailOptions = {
-    from: `"DUALEOFOOD ADMIN" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
-    to: options.email,
+  if (!apiKey) {
+    console.error('❌ Thiếu BREVO_API_KEY trong biến môi trường!');
+    throw new Error('Chưa cấu hình API Key gửi email. Vui lòng liên hệ Admin.');
+  }
+
+  const emailData = {
+    sender: {
+      name: 'DUALEOFOOD ADMIN',
+      email: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'nguynducthanh555@gmail.com',
+    },
+    to: [{ email: options.email }],
     subject: options.subject,
-    html: options.html, // Hỗ trợ gửi email bằng code HTML cho đẹp
+    htmlContent: options.html,
   };
 
-  // 3. Gửi email với log chi tiết
   try {
-    console.log(`📧 Đang gửi email tới: ${options.email} qua ${process.env.EMAIL_HOST}:${process.env.EMAIL_PORT}`);
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Email đã gửi thành công tới: ${options.email} | MessageId: ${info.messageId}`);
-    return info;
+    console.log(`📧 Đang gửi email tới: ${options.email} qua Brevo HTTP API...`);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': apiKey,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(emailData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error(`❌ Brevo API lỗi:`, JSON.stringify(result));
+      throw new Error(result.message || 'Gửi email thất bại');
+    }
+
+    console.log(`✅ Email đã gửi thành công tới: ${options.email} | MessageId: ${result.messageId}`);
+    return result;
   } catch (error) {
     console.error(`❌ Lỗi gửi email tới ${options.email}:`, error.message);
-    console.error(`❌ Chi tiết: HOST=${process.env.EMAIL_HOST}, PORT=${process.env.EMAIL_PORT}, USER=${process.env.EMAIL_USER}`);
     throw new Error(`Không thể gửi email: ${error.message}`);
   }
 };
