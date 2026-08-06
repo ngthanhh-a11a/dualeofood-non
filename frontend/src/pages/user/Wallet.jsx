@@ -39,10 +39,22 @@ const Wallet = () => {
         fetchMyVouchers();
     }, []);
 
-    // Sửa lại dòng này để đảm bảo vouchers luôn là mảng
-    const displayVouchers = (Array.isArray(vouchers) ? vouchers : []).filter(v => 
-        activeTab === 'available' ? !v.isUsed : v.isUsed
-    );
+    const isCouponValid = (coupon) => {
+        if (!coupon) return false;
+        if (!coupon.isActive) return false;
+        if (new Date(coupon.expiryDate) < new Date()) return false;
+        if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) return false;
+        return true;
+    };
+
+    const displayVouchers = (Array.isArray(vouchers) ? vouchers : []).filter(v => {
+        const isValid = isCouponValid(v.coupon);
+        if (activeTab === 'available') {
+            return !v.isUsed && isValid;
+        } else {
+            return v.isUsed || !isValid;
+        }
+    });
 
     if (loading) {
         return (
@@ -77,7 +89,7 @@ const Wallet = () => {
             {displayVouchers.length === 0 ? (
                 <div className="text-center text-gray-500 bg-gray-50 py-16 rounded-lg">
                     <p className="text-xl mb-4">
-                        {activeTab === 'available' ? 'Bạn chưa có mã giảm giá nào.' : 'Bạn chưa sử dụng mã giảm giá nào.'}
+                        {activeTab === 'available' ? 'Bạn chưa có mã giảm giá nào.' : 'Bạn chưa có mã nào đã dùng hoặc hết hạn.'}
                     </p>
                     <Link to="/promotions" className="bg-sky-500 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-600 transition">
                         Săn Voucher ngay!
@@ -85,27 +97,45 @@ const Wallet = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    {displayVouchers.map(({ _id, coupon, isUsed, usedAt }) => (
-                        <div key={_id} className={`border rounded-2xl p-6 shadow-sm bg-white flex flex-col justify-between relative overflow-hidden group ${isUsed ? 'border-gray-200 bg-gray-50' : 'border-sky-100 hover:shadow-lg'}`}>
-                            <div className={`absolute top-0 right-0 w-20 h-20 rounded-bl-full -z-10 opacity-5 transition-opacity ${isUsed ? 'bg-gray-400' : 'bg-sky-500 group-hover:opacity-10'}`}></div>
-                            
-                            <div>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className={`font-bold px-4 py-2 rounded-lg border inline-block uppercase tracking-wider text-sm shadow-sm ${isUsed ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-sky-50 text-sky-600 border-sky-200'}`}>
-                                        {coupon?.code}
+                    {displayVouchers.map(({ _id, coupon, isUsed, usedAt }) => {
+                        const isValid = isCouponValid(coupon);
+                        const isInactive = !isUsed && !isValid;
+                        const cardDisabled = isUsed || isInactive;
+                        
+                        let statusText = 'Dùng ngay';
+                        if (isUsed) statusText = 'Đã sử dụng';
+                        else if (isInactive) {
+                            if (!coupon.isActive) statusText = 'Vô hiệu hóa';
+                            else if (new Date(coupon.expiryDate) < new Date()) statusText = 'Hết hạn';
+                            else statusText = 'Hết lượt dùng';
+                        }
+
+                        return (
+                            <div key={_id} className={`border rounded-2xl p-6 shadow-sm bg-white flex flex-col justify-between relative overflow-hidden group ${cardDisabled ? 'border-gray-200 bg-gray-50' : 'border-sky-100 hover:shadow-lg'}`}>
+                                <div className={`absolute top-0 right-0 w-20 h-20 rounded-bl-full -z-10 opacity-5 transition-opacity ${cardDisabled ? 'bg-gray-400' : 'bg-sky-500 group-hover:opacity-10'}`}></div>
+                                
+                                <div>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className={`font-bold px-4 py-2 rounded-lg border inline-block uppercase tracking-wider text-sm shadow-sm ${cardDisabled ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-sky-50 text-sky-600 border-sky-200'}`}>
+                                            {coupon?.code}
+                                        </div>
+                                    </div>
+                                    <h3 className={`text-xl font-bold mb-2 ${cardDisabled ? 'text-gray-500' : 'text-gray-800'}`}>Ưu đãi {coupon?.code}</h3>
+                                    <p className={`mb-5 text-sm line-clamp-2 ${cardDisabled ? 'text-gray-400' : 'text-gray-600'}`}>
+                                        Giảm <span className={`font-bold ${cardDisabled ? 'text-gray-500' : 'text-sky-500'}`}>{coupon?.discountPercent}%</span> (tối đa <span className={`font-bold ${cardDisabled ? 'text-gray-500' : 'text-sky-500'}`}>{coupon?.maxDiscountAmount?.toLocaleString('vi-VN') || 0}đ</span>) cho đơn từ <span className="font-bold">{coupon?.minOrderValue?.toLocaleString('vi-VN') || 0}đ</span>.
+                                    </p>
+                                    <div className={`flex items-center text-xs font-medium mb-6 p-3 rounded-lg border ${cardDisabled ? 'bg-gray-100 border-gray-200 text-gray-500' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                                        <span className="mr-2 text-lg">⏰</span> HSD: {coupon?.expiryDate ? new Date(coupon.expiryDate).toLocaleDateString('vi-VN') : 'Không giới hạn'}
                                     </div>
                                 </div>
-                                <h3 className={`text-xl font-bold mb-2 ${isUsed ? 'text-gray-500' : 'text-gray-800'}`}>Ưu đãi {coupon?.code}</h3>
-                                <p className={`mb-5 text-sm line-clamp-2 ${isUsed ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    Giảm <span className={`font-bold ${isUsed ? 'text-gray-500' : 'text-sky-500'}`}>{coupon?.discountPercent}%</span> (tối đa <span className={`font-bold ${isUsed ? 'text-gray-500' : 'text-sky-500'}`}>{coupon?.maxDiscountAmount?.toLocaleString('vi-VN') || 0}đ</span>) cho đơn từ <span className="font-bold">{coupon?.minOrderValue?.toLocaleString('vi-VN') || 0}đ</span>.
-                                </p>
-                                <div className={`flex items-center text-xs font-medium mb-6 p-3 rounded-lg border ${isUsed ? 'bg-gray-100 border-gray-200 text-gray-500' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
-                                    <span className="mr-2 text-lg">⏰</span> HSD: {coupon?.expiryDate ? new Date(coupon.expiryDate).toLocaleDateString('vi-VN') : 'Không giới hạn'}
-                                </div>
+                                {cardDisabled ? (
+                                    <div className="mt-auto w-full text-center bg-gray-200 text-gray-500 font-bold py-3 px-4 rounded-xl">{statusText}</div>
+                                ) : (
+                                    <Link to="/cart" className="mt-auto w-full text-center bg-sky-500 hover:bg-sky-600 active:scale-95 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg">Dùng ngay</Link>
+                                )}
                             </div>
-                            {isUsed ? (<div className="mt-auto w-full text-center bg-gray-200 text-gray-500 font-bold py-3 px-4 rounded-xl">Đã sử dụng</div>) : (<Link to="/cart" className="mt-auto w-full text-center bg-sky-500 hover:bg-sky-600 active:scale-95 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg">Dùng ngay</Link>)}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
