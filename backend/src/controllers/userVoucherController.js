@@ -7,10 +7,21 @@ const saveVoucher = asyncHandler(async (req, res) => {
   const { couponId } = req.body;
   const userId = req.user.id; // Lấy từ middleware xác thực
 
-  // (Tùy chọn) Kiểm tra xem mã giảm giá gốc có thực sự tồn tại không
+  // Kiểm tra xem mã giảm giá gốc có thực sự tồn tại không
   const coupon = await Coupon.findById(couponId);
   if (!coupon) {
     return res.status(404).json({ message: 'Mã giảm giá không tồn tại hoặc đã bị xóa!' });
+  }
+
+  // Kiểm tra tính hợp lệ của mã trước khi lưu
+  if (!coupon.isActive) {
+      return res.status(400).json({ message: 'Mã giảm giá này đã bị vô hiệu hóa!' });
+  }
+  if (new Date(coupon.expiryDate) < new Date()) {
+      return res.status(400).json({ message: 'Mã giảm giá này đã hết hạn!' });
+  }
+  if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) {
+      return res.status(400).json({ message: 'Mã giảm giá này đã hết lượt sử dụng!' });
   }
 
   // Tạo bản ghi lưu vào ví

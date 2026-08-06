@@ -92,7 +92,16 @@ const Promotions = () => {
         const fetchCoupons = async () => {
             try {
                 const couponsRes = await axios.get('/coupons');
-                setCoupons(couponsRes.data);
+                
+                // Lọc bỏ các mã không hợp lệ (hết hạn, vô hiệu, hết lượt)
+                const activeCoupons = couponsRes.data.filter(coupon => {
+                    if (!coupon.isActive) return false;
+                    if (new Date(coupon.expiryDate) < new Date()) return false;
+                    if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) return false;
+                    return true;
+                });
+                
+                setCoupons(activeCoupons);
 
                 if (token) {
                     const myVouchersRes = await axios.get('/vouchers/my-vouchers');

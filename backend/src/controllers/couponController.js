@@ -16,6 +16,11 @@ exports.verifyCoupon = async (req, res) => {
             return res.status(400).json({ message: 'Mã giảm giá đã hết hạn!' });
         }
 
+        // Kiểm tra lượt sử dụng
+        if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) {
+            return res.status(400).json({ message: 'Mã giảm giá đã hết lượt sử dụng!' });
+        }
+
         // Kiểm tra giá trị biên (Boundary Value) - Đơn hàng có đủ điều kiện không?
         if (orderValue < coupon.minOrderValue) {
             return res.status(400).json({ 
