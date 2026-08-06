@@ -121,7 +121,15 @@ const Cart = () => {
       const fetchAvailableVouchers = async () => {
         try {
           const res = await axios.get('/vouchers/my-vouchers');
-          const validVouchers = (Array.isArray(res.data) ? res.data : []).filter(v => !v.isUsed);
+          const validVouchers = (Array.isArray(res.data) ? res.data : []).filter(v => {
+             if (v.isUsed) return false;
+             const coupon = v.coupon;
+             if (!coupon) return false;
+             if (!coupon.isActive) return false;
+             if (new Date(coupon.expiryDate) < new Date()) return false;
+             if (coupon.usageLimit !== null && coupon.usageCount >= coupon.usageLimit) return false;
+             return true;
+          });
           setAvailableVouchers(validVouchers);
         } catch (error) {
           console.error("Lỗi lấy ví voucher:", error);
