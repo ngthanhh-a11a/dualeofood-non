@@ -84,7 +84,6 @@ const Checkout = () => {
   const [qrGenerated, setQrGenerated] = useState(false); // Trạng thái đã tạo mã QR chưa
   const [isCheckingPayment, setIsCheckingPayment] = useState(false); // Trạng thái loading chờ ngân hàng
   const [pendingOrder, setPendingOrder] = useState(null); // State để lưu đơn hàng đang chờ thanh toán
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Thông tin ngân hàng của bạn
   const bankId = 'TPB'; 
@@ -104,17 +103,19 @@ const Checkout = () => {
 
     socket.on('payment_confirmed', (confirmedOrder) => {
       if (confirmedOrder._id === pendingOrder._id) {
-        toast.success('Thanh toán đã được xác nhận!');
         dispatch(clearCart());
-        setShowSuccessModal(true);
-        setIsCheckingPayment(false); // Dừng trạng thái chờ
+        setIsCheckingPayment(false);
+        navigate('/order-success', {
+          replace: true,
+          state: { fromCheckout: true, paymentMethod: 'QR_CODE', orderId: confirmedOrder._id },
+        });
       }
     });
 
     return () => {
       socket.off('payment_confirmed');
     };
-  }, [pendingOrder, dispatch, socket]);
+  }, [pendingOrder, dispatch, socket, navigate]);
 
   // Hàm gửi API tạo đơn hàng
   const createOrderRequest = async () => {
@@ -131,10 +132,12 @@ const Checkout = () => {
       const { data } = await axios.post('/orders', orderData);
 
       if (paymentMethod === 'CASH') {
-        // Với tiền mặt, xử lý thành công luôn
+        // Với tiền mặt, xử lý thành công luôn → chuyển sang trang xác nhận
         dispatch(clearCart());
-        setShowSuccessModal(true);
-        setIsCheckingPayment(false);
+        navigate('/order-success', {
+          replace: true,
+          state: { fromCheckout: true, paymentMethod: 'CASH', orderId: data.order?._id },
+        });
       } else if (paymentMethod === 'QR_CODE') {
         // Với QR, lưu đơn hàng đang chờ và hiển thị mã QR
         setPendingOrder(data.order);
@@ -158,14 +161,7 @@ const Checkout = () => {
     createOrderRequest(); // Hàm này sẽ tự phân luồng cho CASH hoặc QR
   };
 
-  const handleCloseModal = () => {
-    setShowSuccessModal(false);
-    // Vì giỏ hàng đã trống, chuyển người dùng đến trang "Đơn hàng của tôi"
-    // thay vì quay lại giỏ hàng trống.
-    // Thêm { replace: true } để xóa state của trang checkout khỏi lịch sử,
-    // tránh việc người dùng bấm "Back" và quay lại với state giảm giá cũ.
-    navigate('/my-orders', { replace: true });
-  };
+
 
   // Tìm đối tượng địa chỉ đang được chọn để hiển thị
   const selectedAddress = savedAddresses.find(addr => addr._id === selectedAddressId);
@@ -379,30 +375,7 @@ const Checkout = () => {
         </div>
       </div>
 
-      {/* ================= CỬA SỔ THÔNG BÁO (MODAL) ================= */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
-          <div className="bg-white p-8 rounded-3xl shadow-2xl w-11/12 max-w-md text-center transform animate-modal-in">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path>
-              </svg>
-            </div>
-            <h3 className="text-3xl font-black text-gray-800 mb-2">Thành công!</h3>
-            <p className="text-gray-600 mb-8 font-medium leading-relaxed">
-              {paymentMethod === 'QR_CODE' 
-                ? 'Hệ thống đã nhận được thanh toán của bạn. Đơn hàng sẽ được chuẩn bị và giao đi ngay lập tức.' 
-                : 'Đơn hàng của bạn đã được đặt thành công. Chúng tôi sẽ chuẩn bị món và giao đến bạn sớm nhất!'}
-            </p>
-            <button 
-              onClick={handleCloseModal}
-              className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl transition duration-300 shadow-md"
-            >
-              Xem đơn hàng của tôi
-            </button>
-          </div>
-        </div>
-      )}
+
       </div>
     </div>
   );

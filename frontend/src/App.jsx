@@ -12,6 +12,7 @@ import ProductDetail from './pages/public/ProductDetail';
 import Cart from './pages/public/Cart';
 import Contact from './pages/public/Contact';
 import Checkout from './pages/checkout/Checkout';
+import OrderSuccess from './pages/checkout/OrderSuccess';
 import MyOrders from './pages/user/MyOrders';
 import Profile from './pages/user/Profile';
 import MyReviews from './pages/user/MyReviews';
@@ -97,6 +98,7 @@ function App() {
           <Route path="blog/:slug" element={<BlogDetail />} />
           {/* Các route cần đăng nhập */}
           <Route path="checkout" element={<PrivateRoute><Checkout /></PrivateRoute>} />
+          <Route path="order-success" element={<PrivateRoute><OrderSuccess /></PrivateRoute>} />
           <Route path="my-orders" element={<PrivateRoute><MyOrders /></PrivateRoute>} />
           <Route path="my-reviews" element={<PrivateRoute><MyReviews /></PrivateRoute>} />
           <Route path="profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
