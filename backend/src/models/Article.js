@@ -6,7 +6,8 @@ const articleCommentSchema = new mongoose.Schema({
     name: { type: String, required: true },
     avatar: { type: String, default: '' },
     content: { type: String, required: true },
-    isHidden: { type: Boolean, default: false }
+    isHidden: { type: Boolean, default: false },
+    isPinned: { type: Boolean, default: false }
 }, {
     timestamps: true,
 });

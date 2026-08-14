@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from '../../utils/axiosConfig';
 import { FiClock, FiEye, FiUser, FiArrowLeft, FiTag, FiThumbsUp, FiMessageSquare, FiSend, FiEyeOff } from 'react-icons/fi';
+import { TbPinFilled } from 'react-icons/tb';
 import toast from 'react-hot-toast';
 
 const BlogDetail = () => {
@@ -260,7 +261,11 @@ const BlogDetail = () => {
                                 <p className="text-center text-slate-400 py-8 italic">Chưa có bình luận nào. Hãy là người đầu tiên chia sẻ suy nghĩ!</p>
                             ) : (
                                 comments.filter(c => !c.isHidden || (userInfo && (userInfo.role === 'admin' || userInfo.role === 'staff')))
-                                    .reverse()
+                                    .sort((a, b) => {
+                                        if (a.isPinned && !b.isPinned) return -1;
+                                        if (!a.isPinned && b.isPinned) return 1;
+                                        return new Date(b.createdAt) - new Date(a.createdAt);
+                                    })
                                     .map((cmt, idx) => {
                                         const displayAvatar = (cmt.user && cmt.user.avatar) ? cmt.user.avatar : cmt.avatar;
                                         
@@ -276,7 +281,10 @@ const BlogDetail = () => {
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
                                                 <div className="flex items-baseline gap-2">
-                                                    <h4 className="font-bold text-slate-800">{cmt.name}</h4>
+                                                    <h4 className="font-bold text-slate-800 flex items-center gap-1">
+                                                        {cmt.name}
+                                                        {cmt.isPinned && <TbPinFilled className="text-amber-500" size={14} title="Bình luận được ghim" />}
+                                                    </h4>
                                                     <span className="text-xs text-slate-400">{new Date(cmt.createdAt).toLocaleString('vi-VN')}</span>
                                                     {cmt.isHidden && (
                                                         <span className="text-[10px] bg-slate-300 text-slate-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Đã ẩn</span>

@@ -34,11 +34,14 @@ router.route('/')
     .get(optionalAuth, articleController.getArticles)
     .post(verifyToken, adminOrStaff, upload.single('thumbnail'), articleController.createArticle);
 
+router.get('/comments/all', verifyToken, adminOrStaff, articleController.getAllArticleComments);
+
 router.route('/:slug').get(articleController.getArticleBySlug);
 router.route('/id/:id').get(verifyToken, adminOrStaff, articleController.getArticleById);
 
 router.route('/:id/comments').post(verifyToken, articleController.addComment);
 router.route('/:id/comments/:commentId/visibility').put(verifyToken, adminOrStaff, articleController.toggleCommentVisibility);
+router.route('/:id/comments/:commentId/pin').put(verifyToken, adminOrStaff, articleController.toggleArticleCommentPin);
 router.route('/:id/clap').post(verifyToken, articleController.addClap);
 router.route('/:id/unclap').post(verifyToken, articleController.removeClap);
 

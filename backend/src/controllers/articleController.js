@@ -244,4 +244,50 @@ const toggleCommentVisibility = asyncHandler(async (req, res) => {
     res.json({ message: comment.isHidden ? 'Đã ẩn bình luận' : 'Đã hiện bình luận', comments: article.comments });
 });
 
-module.exports = { getArticles, getArticleBySlug, getArticleById, createArticle, updateArticle, deleteArticle, addComment, addClap, removeClap, toggleCommentVisibility };
+// @desc    Toggle comment pin status (Admin/Staff only)
+// @route   PUT /api/articles/:id/comments/:commentId/pin
+// @access  Private (Admin/Staff)
+const toggleArticleCommentPin = asyncHandler(async (req, res) => {
+    const article = await Article.findById(req.params.id);
+
+    if (!article) {
+        res.status(404);
+        throw new Error('Không tìm thấy bài viết');
+    }
+
+    const comment = article.comments.id(req.params.commentId);
+    
+    if (!comment) {
+        res.status(404);
+        throw new Error('Không tìm thấy bình luận');
+    }
+
+    comment.isPinned = !comment.isPinned;
+    await article.save();
+
+    res.json({ message: comment.isPinned ? 'Đã ghim bình luận' : 'Đã bỏ ghim bình luận', comments: article.comments });
+});
+
+// @desc    Get all article comments globally (Admin/Staff only)
+// @route   GET /api/articles/comments/all
+// @access  Private (Admin/Staff)
+const getAllArticleComments = asyncHandler(async (req, res) => {
+    const articles = await Article.find({ 'comments.0': { $exists: true } })
+        .populate('comments.user', 'avatar')
+        .select('title thumbnail comments');
+        
+    let allComments = [];
+    articles.forEach(article => {
+        article.comments.forEach(comment => {
+            allComments.push({
+                ...comment.toObject(),
+                article: { _id: article._id, title: article.title, thumbnail: article.thumbnail }
+            });
+        });
+    });
+    
+    allComments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(allComments);
+});
+
+module.exports = { getArticles, getArticleBySlug, getArticleById, createArticle, updateArticle, deleteArticle, addComment, addClap, removeClap, toggleCommentVisibility, toggleArticleCommentPin, getAllArticleComments };

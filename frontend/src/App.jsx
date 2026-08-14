@@ -25,6 +25,10 @@ import ResetPassword from './pages/public/ResetPassword';
 import Blog from './pages/public/Blog';
 import BlogDetail from './pages/public/BlogDetail';
 import CustomerChatWidget from './components/features/CustomerChatWidget';
+import PrivacyPolicy from './pages/public/policies/PrivacyPolicy';
+import TermsOfService from './pages/public/policies/TermsOfService';
+import ReturnPolicy from './pages/public/policies/ReturnPolicy';
+import ShoppingGuide from './pages/public/policies/ShoppingGuide';
 
 // Nhúng các component Admin
 import AuthModal from './components/auth/AuthModal';
@@ -40,6 +44,8 @@ import AdminProducts from './pages/admin/AdminProducts';
 import AdminBroadcast from './pages/admin/AdminBroadcast';
 import BannerManager from './pages/admin/BannerManager';
 import ArticleManager from './pages/admin/ArticleManager';
+import AdminSettings from './pages/admin/AdminSettings';
+import ReviewManager from './pages/admin/ReviewManager';
 
 // === NHÚNG CÁC COMPONENT STAFF (MỚI) ===
 import StaffLayout from './layouts/StaffLayout';
@@ -96,6 +102,10 @@ function App() {
           <Route path="promotions" element={<Promotions />} />
           <Route path="blog" element={<Blog />} />
           <Route path="blog/:slug" element={<BlogDetail />} />
+          <Route path="privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="terms-of-service" element={<TermsOfService />} />
+          <Route path="return-policy" element={<ReturnPolicy />} />
+          <Route path="shopping-guide" element={<ShoppingGuide />} />
           {/* Các route cần đăng nhập */}
           <Route path="checkout" element={<PrivateRoute><Checkout /></PrivateRoute>} />
           <Route path="order-success" element={<PrivateRoute><OrderSuccess /></PrivateRoute>} />
@@ -128,6 +138,8 @@ function App() {
           <Route path="broadcast" element={<AdminBroadcast />} />
           <Route path="banners" element={<BannerManager />} />
           <Route path="articles" element={<ArticleManager />} />
+          <Route path="reviews" element={<ReviewManager />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
 
         {/* ================= ROUTES CHO STAFF (Role 'staff' hoặc 'admin') ================= */}

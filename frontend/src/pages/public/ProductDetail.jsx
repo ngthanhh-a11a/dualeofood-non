@@ -5,6 +5,7 @@ import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import { addToCart } from '../../redux/cartSlice';
 import toast from 'react-hot-toast';
 import { FiStar, FiShoppingCart, FiArrowLeft, FiEdit, FiEye, FiEyeOff } from 'react-icons/fi'; // Import FiShoppingCart
+import { TbPinFilled } from 'react-icons/tb';
 import StarRating from '../../components/common/StarRating'; // Import component
 import ReviewModal from '../../components/features/ReviewModal';
 import { useAddToCartAnimation } from '../../hooks/useAddToCartAnimation'; // Import hook animation
@@ -236,7 +237,12 @@ const ProductDetail = () => {
           <div className="space-y-8">
             {product.reviews
               .filter(r => !r.isHidden || (userInfo && (userInfo.role === 'admin' || userInfo.role === 'staff')))
-              .slice(0).reverse().map((review) => {
+              .sort((a, b) => {
+                  if (a.isPinned && !b.isPinned) return -1;
+                  if (!a.isPinned && b.isPinned) return 1;
+                  return new Date(b.createdAt) - new Date(a.createdAt);
+              })
+              .map((review) => {
                 const displayAvatar = (review.user && review.user.avatar) ? review.user.avatar : review.avatar;
                 
                 return (
@@ -252,7 +258,10 @@ const ProductDetail = () => {
                     </div>
                     <div className="flex flex-col">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-bold text-gray-800">{review.name}</h4>
+                        <h4 className="font-bold text-gray-800 flex items-center gap-1">
+                          {review.name}
+                          {review.isPinned && <TbPinFilled className="text-amber-500" size={16} title="Bình luận được ghim" />}
+                        </h4>
                         {review.isHidden && (
                           <span className="text-[10px] bg-slate-300 text-slate-600 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Đã ẩn</span>
                         )}

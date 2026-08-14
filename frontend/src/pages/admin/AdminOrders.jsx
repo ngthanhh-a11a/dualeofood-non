@@ -3,7 +3,7 @@ import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 // 1. Import socket.io-client
 import { useSocket } from '../../contexts/SocketContext';
 import toast from 'react-hot-toast'; // Import toast để tạo thông báo
-import { FiSettings, FiX, FiPrinter } from 'react-icons/fi';
+import { FiPrinter } from 'react-icons/fi';
 import OrderReceipt from '../../components/admin/OrderReceipt';
 
 const AdminOrders = () => {
@@ -16,10 +16,6 @@ const AdminOrders = () => {
   const socket = useSocket();
   const [pagination, setPagination] = useState({ currentPage: 1, totalPages: 1 });
 
-  // State cho modal cài đặt
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [orderSettings, setOrderSettings] = useState({ enabled: false, deleteAfterDays: 90 });
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // State cho in ấn hóa đơn
   const [printingOrder, setPrintingOrder] = useState(null);
@@ -60,19 +56,6 @@ const AdminOrders = () => {
     fetchOrders();
   }, [filterStatus, pagination.currentPage]); // Phụ thuộc vào bộ lọc và trang hiện tại
 
-  // Lấy cài đặt khi component được tải
-  useEffect(() => {
-    const fetchSettings = async () => {
-        try {
-            const { data } = await axios.get('/settings/orders');
-            // Đảm bảo cấu trúc dữ liệu đúng trước khi set state
-            if (data && data.value && data.value.autoDelete) {
-                setOrderSettings(data.value.autoDelete);
-            }
-        } catch (error) { console.error("Không thể tải cài đặt đơn hàng", error); }
-    };
-    fetchSettings();
-  }, []);
 
   // --- START: LOGIC MỚI ĐỂ "MỞ KHÓA" ÂM THANH TRÊN TRÌNH DUYỆT ---
   useEffect(() => {
@@ -173,19 +156,6 @@ const AdminOrders = () => {
     }
   };
 
-  // Hàm lưu cài đặt
-  const handleSaveSettings = async () => {
-    setIsSavingSettings(true);
-    try {
-        await axios.put('/settings/orders', { autoDelete: orderSettings });
-        toast.success('Cài đặt đã được lưu thành công!');
-        setIsSettingsModalOpen(false);
-    } catch (error) {
-        toast.error('Lỗi khi lưu cài đặt!');
-    } finally {
-        setIsSavingSettings(false);
-    }
-  };
 
   const handleFilterChange = (e) => {
     setFilterStatus(e.target.value);
@@ -225,9 +195,6 @@ const AdminOrders = () => {
             <option value="COMPLETED">Hoàn thành</option>
             <option value="CANCELLED">Đã hủy</option>
           </select>
-          <button onClick={() => setIsSettingsModalOpen(true)} className="p-2.5 bg-white border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-sky-500 transition">
-            <FiSettings size={20} />
-          </button>
         </div>
       </div>
 
@@ -365,59 +332,6 @@ const AdminOrders = () => {
         )}
       </div>
 
-      {/* Modal Cài Đặt */}
-      {isSettingsModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg m-4">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2"><FiSettings /> Cài Đặt Đơn Hàng</h2>
-              <button onClick={() => setIsSettingsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <FiX size={24} />
-              </button>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 text-sky-500 rounded focus:ring-sky-500"
-                    checked={orderSettings.enabled}
-                    onChange={(e) => setOrderSettings(prev => ({ ...prev, enabled: e.target.checked }))}
-                  />
-                  <span className="ml-3 font-bold text-gray-700">Tự động xóa đơn hàng đã hoàn thành</span>
-                </label>
-                <p className="text-sm text-gray-500 mt-2 ml-8">
-                  Hệ thống sẽ tự động xóa vĩnh viễn các đơn hàng có trạng thái "Hoàn thành" sau một khoảng thời gian để tối ưu hóa cơ sở dữ liệu.
-                </p>
-              </div>
-
-              {orderSettings.enabled && (
-                <div className="pl-8 animate-fade-in">
-                  <label className="block text-gray-600 font-semibold mb-2">Xóa sau:</label>
-                  <select 
-                    value={orderSettings.deleteAfterDays}
-                    onChange={(e) => setOrderSettings(prev => ({ ...prev, deleteAfterDays: Number(e.target.value) }))}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  >
-                    <option value="30">30 ngày</option>
-                    <option value="60">60 ngày</option>
-                    <option value="90">90 ngày</option>
-                    <option value="180">6 tháng</option>
-                    <option value="365">1 năm</option>
-                  </select>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-8 flex justify-end">
-              <button onClick={handleSaveSettings} disabled={isSavingSettings} className="px-6 py-2.5 bg-sky-500 text-white font-bold rounded-lg hover:bg-sky-600 transition disabled:bg-gray-400">
-                {isSavingSettings ? 'Đang lưu...' : 'Lưu Cài Đặt'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Render Component In Hóa Đơn Ẩn */}
       {printingOrder && <OrderReceipt order={printingOrder} />}

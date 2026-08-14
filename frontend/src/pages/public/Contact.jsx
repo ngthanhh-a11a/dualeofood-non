@@ -122,6 +122,11 @@ const Contact = () => {
   const [formData, setFormData] = useState({ name: '', phone: '', content: '' });
   const [sendState, setSendState] = useState('idle'); // idle | riding | done
   const [visible, setVisible] = useState({ header: false, main: false, faq: false });
+  const [storeInfo, setStoreInfo] = useState({
+    address: '123 Đường Bánh Mì, Quận Gà Rán, TP. Hồ Chí Minh',
+    phone: '1900 1234',
+    email: 'support@dualeofood.com'
+  });
 
   const headerRef = useRef(null);
   const mainRef = useRef(null);
@@ -146,6 +151,25 @@ const Contact = () => {
     if (mainRef.current) observer.observe(mainRef.current);
     if (faqRef.current) observer.observe(faqRef.current);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await axios.get('/settings/public');
+        if (res.data && res.data.storeInfo) {
+          const info = res.data.storeInfo;
+          setStoreInfo({
+            address: info.address || '123 Đường Bánh Mì, Quận Gà Rán, TP. Hồ Chí Minh',
+            phone: info.phone || '1900 1234',
+            email: info.email || 'support@dualeofood.com'
+          });
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải thông tin cửa hàng", error);
+      }
+    };
+    fetchSettings();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -263,9 +287,9 @@ const Contact = () => {
             {/* Contact Info Cards */}
             <div className="space-y-4">
               <h2 className="text-lg font-black text-slate-700 tracking-tight">Thông tin liên hệ</h2>
-              <TiltCard emoji="📍" title="Địa chỉ cửa hàng" value="123 Đường Bánh Mì" sub="Quận Gà Rán, TP. Hồ Chí Minh" />
-              <TiltCard emoji="📞" title="Đường dây nóng" value="1900 1234" sub="Miễn phí từ 8h đến 22h hàng ngày" />
-              <TiltCard emoji="✉️" title="Email hỗ trợ" value="support@dualeofood.com" />
+              <TiltCard emoji="📍" title="Địa chỉ cửa hàng" value={storeInfo.address} />
+              <TiltCard emoji="📞" title="Đường dây nóng" value={storeInfo.phone} />
+              <TiltCard emoji="✉️" title="Email hỗ trợ" value={storeInfo.email} />
               <TiltCard emoji="⏰" title="Giờ hoạt động" value="07:00 — 22:30" sub="Tất cả các ngày trong tuần" />
             </div>
 
@@ -395,11 +419,11 @@ const Contact = () => {
             <div className="mt-8 text-center border-t border-slate-100 pt-7">
               <p className="text-slate-500 text-sm mb-3">Vẫn chưa tìm được câu trả lời? Chúng tôi sẵn sàng hỗ trợ!</p>
               <div className="flex flex-wrap items-center justify-center gap-3">
-                <a href="tel:19001234" className="inline-flex items-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-sky-100 transition-colors">
-                  📞 Gọi ngay: 1900 1234
+                <a href={`tel:${storeInfo.phone.replace(/\s+/g, '')}`} className="inline-flex items-center gap-2 bg-sky-50 border border-sky-100 text-sky-600 font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-sky-100 transition-colors">
+                  📞 Gọi ngay: {storeInfo.phone}
                 </a>
-                <a href="mailto:support@dualeofood.com" className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 text-slate-600 font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-slate-100 transition-colors">
-                  ✉️ support@dualeofood.com
+                <a href={`mailto:${storeInfo.email}`} className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 text-slate-600 font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-slate-100 transition-colors">
+                  ✉️ {storeInfo.email}
                 </a>
               </div>
             </div>

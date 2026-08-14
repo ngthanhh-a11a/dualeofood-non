@@ -327,5 +327,48 @@ const toggleProductReviewVisibility = asyncHandler(async (req, res) => {
     });
 });
 
+// ================= LẤY TẤT CẢ ĐÁNH GIÁ MÓN ĂN (ADMIN) =================
+const getAllProductReviews = asyncHandler(async (req, res) => {
+    const products = await Product.find({ 'reviews.0': { $exists: true } })
+        .populate('reviews.user', 'avatar')
+        .select('name image reviews');
+        
+    let allReviews = [];
+    products.forEach(product => {
+        product.reviews.forEach(review => {
+            allReviews.push({
+                ...review.toObject(),
+                product: { _id: product._id, name: product.name, image: product.image }
+            });
+        });
+    });
+    
+    allReviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(allReviews);
+});
+
+// ================= GHIM/BỎ GHIM ĐÁNH GIÁ (ADMIN/STAFF) =================
+const toggleProductReviewPin = asyncHandler(async (req, res) => {
+    const product = await Product.findById(req.params.id);
+
+    if (!product) {
+        return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+    }
+
+    const review = product.reviews.id(req.params.reviewId);
+    
+    if (!review) {
+        return res.status(404).json({ message: 'Không tìm thấy đánh giá' });
+    }
+
+    review.isPinned = !review.isPinned;
+    await product.save();
+
+    res.json({ 
+        message: review.isPinned ? 'Đã ghim đánh giá' : 'Đã bỏ ghim đánh giá', 
+        reviews: product.reviews
+    });
+});
+
 // NHỚ XUẤT ĐÚNG TÊN HÀM Ở ĐÂY THÌ BÊN ROUTE MỚI ĐỌC ĐƯỢC
-module.exports = { createProduct, getProducts, deleteProduct, updateProduct, getProductById, createProductReview, getProductReviewStats, pinProduct, getPinnedProducts, toggleProductReviewVisibility };
+module.exports = { createProduct, getProducts, deleteProduct, updateProduct, getProductById, createProductReview, getProductReviewStats, pinProduct, getPinnedProducts, toggleProductReviewVisibility, getAllProductReviews, toggleProductReviewPin };

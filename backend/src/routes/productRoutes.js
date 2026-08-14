@@ -23,6 +23,9 @@ const upload = multer({ storage });
 // Lấy danh sách thì không cần token bảo vệ
 router.get('/', productController.getProducts); 
 
+// Lấy tất cả đánh giá (Admin)
+router.get('/reviews/all', verifyToken, adminOrStaff, productController.getAllProductReviews);
+
 // Route lấy thống kê đánh giá (phải đặt trước route /:id)
 router.get('/stats/reviews', verifyToken, isAdmin, productController.getProductReviewStats);
 
@@ -37,6 +40,7 @@ router.put('/:id', verifyToken, isAdmin, upload.single('image'), productControll
 // Route được bảo vệ, chỉ user đã đăng nhập mới có thể tạo review
 router.route('/:id/reviews').post(verifyToken, productController.createProductReview);
 router.route('/:id/reviews/:reviewId/visibility').put(verifyToken, adminOrStaff, productController.toggleProductReviewVisibility);
+router.route('/:id/reviews/:reviewId/pin').put(verifyToken, adminOrStaff, productController.toggleProductReviewPin);
 
 // Route để ghim sản phẩm
 router.put('/:id/pin', verifyToken, isAdmin, productController.pinProduct);

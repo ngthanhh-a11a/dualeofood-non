@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import logoImage from '../../assets/logo.png';
 import { FiFacebook, FiInstagram, FiTwitter } from 'react-icons/fi';
+import axios from '../../utils/axiosConfig';
 
 const Footer = () => {
   const [isVisible, setIsVisible] = useState(false);
@@ -20,6 +21,31 @@ const Footer = () => {
 
     if (footerRef.current) observer.observe(footerRef.current);
     return () => observer.disconnect();
+  }, []);
+
+  const [storeInfo, setStoreInfo] = useState({
+    address: '123 Đường Bánh Mì, Quận Gà Rán, TP. HCM',
+    phone: '1900 1234',
+    email: 'support@dualeofood.com'
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await axios.get('/settings/public');
+        if (res.data && res.data.storeInfo) {
+          const info = res.data.storeInfo;
+          setStoreInfo({
+            address: info.address || '123 Đường Bánh Mì, Quận Gà Rán, TP. HCM',
+            phone: info.phone || '1900 1234',
+            email: info.email || 'support@dualeofood.com'
+          });
+        }
+      } catch (error) {
+        console.error("Lỗi khi tải thông tin cửa hàng", error);
+      }
+    };
+    fetchSettings();
   }, []);
 
   return (
@@ -61,10 +87,10 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-black text-gray-800 mb-6 uppercase tracking-wider">Chính Sách</h3>
             <ul className="space-y-4 font-semibold text-gray-500">
-              <li><a href="#" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Bảo Mật Thông Tin</a></li>
-              <li><a href="#" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Điều Khoản Dịch Vụ</a></li>
-              <li><a href="#" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Chính Sách Đổi Trả</a></li>
-              <li><a href="#" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Hướng Dẫn Mua Hàng</a></li>
+              <li><Link to="/privacy-policy" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Bảo Mật Thông Tin</Link></li>
+              <li><Link to="/terms-of-service" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Điều Khoản Dịch Vụ</Link></li>
+              <li><Link to="/return-policy" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Chính Sách Đổi Trả</Link></li>
+              <li><Link to="/shopping-guide" className="hover:text-sky-500 transition flex items-center gap-2"><span className="text-sky-300">▹</span> Hướng Dẫn Mua Hàng</Link></li>
             </ul>
           </div>
 
@@ -72,9 +98,9 @@ const Footer = () => {
           <div>
             <h3 className="text-lg font-black text-gray-800 mb-6 uppercase tracking-wider">Liên Hệ</h3>
             <ul className="space-y-4 text-gray-600 font-medium mb-6">
-              <li className="flex items-start gap-3"><span className="text-sky-500 text-xl">📍</span><span>123 Đường Bánh Mì, Quận Gà Rán, TP. HCM</span></li>
-              <li className="flex items-center gap-3"><span className="text-sky-500 text-xl">📞</span><span className="font-bold text-gray-800">1900 1234</span></li>
-              <li className="flex items-center gap-3"><span className="text-sky-500 text-xl">✉️</span><span>support@dualeofood.com</span></li>
+              <li className="flex items-start gap-3"><span className="text-sky-500 text-xl">📍</span><span>{storeInfo.address}</span></li>
+              <li className="flex items-center gap-3"><span className="text-sky-500 text-xl">📞</span><span className="font-bold text-gray-800">{storeInfo.phone}</span></li>
+              <li className="flex items-center gap-3"><span className="text-sky-500 text-xl">✉️</span><span>{storeInfo.email}</span></li>
             </ul>
           </div>
         </div>

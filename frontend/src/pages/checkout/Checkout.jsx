@@ -16,7 +16,11 @@ const Checkout = () => {
   const location = useLocation();
   const { discountAmount = 0, userVoucherId = null, couponCode = null } = location.state || {}; // Nhận cả ID voucher và mã code
 
-  const shippingFee = 15000;
+  const [shippingFeesList, setShippingFeesList] = useState([]);
+  const [selectedShippingArea, setSelectedShippingArea] = useState(null);
+
+  // Phí vận chuyển mặc định là 15k nếu chưa load được cài đặt, hoặc lấy từ khu vực được chọn
+  const shippingFee = selectedShippingArea ? selectedShippingArea.fee : (shippingFeesList.length > 0 ? shippingFeesList[0].fee : 15000);
   // Tính tổng tiền = Tổng món + Ship - Giảm giá (đảm bảo không bị âm)
   const finalPrice = totalPrice > 0 ? Math.max(0, totalPrice + shippingFee - discountAmount) : 0;
 
@@ -54,7 +58,21 @@ const Checkout = () => {
         toast.error("Không thể tải sổ địa chỉ của bạn.");
       }
     };
+
+    const fetchSettings = async () => {
+      try {
+        const { data } = await axios.get('/settings/public');
+        if (data && data.shippingFees && data.shippingFees.length > 0) {
+          setShippingFeesList(data.shippingFees);
+          setSelectedShippingArea(data.shippingFees[0]);
+        }
+      } catch (error) {
+        console.error("Không thể tải cấu hình vận chuyển", error);
+      }
+    };
+
     fetchAddresses();
+    fetchSettings();
   }, []);
 
   // --- LOGIC MỚI: ĐÓNG DROPDOWN KHI CLICK RA NGOÀI ---
@@ -262,6 +280,27 @@ const Checkout = () => {
                 />
               </div>
 
+              {shippingFeesList.length > 0 && (
+                <div>
+                  <label className="block text-gray-600 font-semibold mb-2">Khu vực giao hàng *</label>
+                  <select 
+                    value={selectedShippingArea ? selectedShippingArea.area : ''}
+                    onChange={(e) => {
+                      const area = shippingFeesList.find(a => a.area === e.target.value);
+                      setSelectedShippingArea(area);
+                    }}
+                    className={`w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition ${selectedAddressId !== 'new' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    disabled={qrGenerated || selectedAddressId !== 'new'}
+                  >
+                    {shippingFeesList.map((item, idx) => (
+                      <option key={idx} value={item.area}>
+                        {item.area} - {item.fee.toLocaleString('vi-VN')}đ
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-gray-600 font-semibold mb-2">Địa chỉ giao hàng chi tiết *</label>
                 <textarea required rows="3" placeholder="Số nhà, tên đường, phường/xã, quận/huyện..." 
@@ -307,7 +346,7 @@ const Checkout = () => {
                   disabled={qrGenerated}
                   className="w-5 h-5 text-sky-500 focus:ring-sky-500" 
                 />
-                <span className="ml-3 font-semibold text-gray-700">Chuyển khoản qua mã QR</span>
+                <span className="ml-3 font-semibold text-gray-700">Chuyển khoản qua mã QR (Thủ công)</span>
               </label>
             </div>
 
