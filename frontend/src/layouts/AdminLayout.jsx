@@ -51,6 +51,8 @@ const AdminLayout = () => {
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userInfo');
+    localStorage.removeItem('chat_guest_id');
+    window.dispatchEvent(new Event('authChange'));
     navigate('/login');
   };
 

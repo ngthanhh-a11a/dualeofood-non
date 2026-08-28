@@ -46,21 +46,14 @@ ${menuStr}
  * @param {Array} history Lịch sử các tin nhắn trước đó (nếu có)
  */
 const generateAutoReply = async (userMessage, history = []) => {
-    if (!process.env.GEMINI_API_KEY) {
-        console.warn("GEMINI_API_KEY chưa được cấu hình!");
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === '') {
+        console.warn("[AI Service] GEMINI_API_KEY chưa được cấu hình trong .env!");
         return "Xin lỗi, hiện tại nhân viên đang bận. Vui lòng để lại lời nhắn hoặc quay lại sau ạ!";
     }
 
-    try {
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-        const systemInstruction = await getRestaurantContext();
-
-        // Chuyển đổi lịch sử chat sang định dạng của Gemini (nếu cần)
-        // Hiện tại để đơn giản, ta gộp systemInstruction vào prompt. 
-        // gemini-1.5-flash hỗ trợ system_instruction nhưng API NodeJS bản thấp có thể khác.
-        // Ta dùng cách nối chuỗi cho an toàn.
-
-        const prompt = `
+    const systemInstruction = await getRestaurantContext();
+    const prompt = `
 [HƯỚNG DẪN HỆ THỐNG]
 ${systemInstruction}
 [/HƯỚNG DẪN HỆ THỐNG]
@@ -68,13 +61,28 @@ ${systemInstruction}
 Khách hàng nhắn: "${userMessage}"
 Bạn (AI Trợ Lý) trả lời:`;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return response.text().trim();
-    } catch (error) {
-        console.error("Lỗi khi gọi Gemini AI:", error);
-        return "Dạ hiện tại hệ thống AI đang gặp chút sự cố, bạn vui lòng chờ nhân viên một chút nhé!";
+    // Danh sách các model thử nghiệm theo thứ tự ưu tiên
+    const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"];
+    let lastError = null;
+
+    for (const modelName of candidateModels) {
+        try {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            const text = response.text();
+            if (text && text.trim()) {
+                console.log(`[AI Service] Trả lời thành công bằng model: ${modelName}`);
+                return text.trim();
+            }
+        } catch (error) {
+            console.error(`[AI Service] Lỗi khi gọi model ${modelName}:`, error.message || error);
+            lastError = error;
+        }
     }
+
+    console.error("[AI Service] Tất cả các model Gemini đều thất bại. Chi tiết lỗi cuối:", lastError);
+    return "Dạ hiện tại hệ thống AI đang gặp chút sự cố, bạn vui lòng chờ nhân viên một chút nhé!";
 };
 
 module.exports = {

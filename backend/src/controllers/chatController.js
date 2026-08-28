@@ -4,22 +4,39 @@ const ChatConversation = require('../models/ChatConversation');
 exports.getChatHistory = async (req, res) => {
     try {
         const { guestId, userId } = req.query;
-        
-        let orConditions = [];
-        // Ưu tiên tìm theo guestId (cố định trên trình duyệt)
-        if (guestId && guestId !== 'null') {
-            orConditions.push({ guestId });
-        }
-        // Kèm theo userId (nếu đăng nhập trên máy mới)
-        if (userId && userId !== 'null') {
-            orConditions.push({ userId });
-        }
+        let conversation = null;
 
-        if (orConditions.length === 0) {
+        const hasUserId = userId && userId !== 'null' && userId !== 'undefined';
+        const hasGuestId = guestId && guestId !== 'null' && guestId !== 'undefined';
+
+        if (!hasUserId && !hasGuestId) {
             return res.status(400).json({ success: false, message: 'Missing userId or guestId' });
         }
 
-        let conversation = await ChatConversation.findOne({ $or: orConditions }).sort({ updatedAt: -1 });
+        if (hasUserId) {
+            // Đã đăng nhập: Ưu tiên tìm hội thoại gắn trực tiếp với userId này
+            conversation = await ChatConversation.findOne({ userId }).sort({ updatedAt: -1 });
+
+            // Nếu người dùng này chưa có hội thoại, kiểm tra nếu có phiên guest (chưa thuộc về userId nào khác)
+            if (!conversation && hasGuestId) {
+                const guestConv = await ChatConversation.findOne({
+                    guestId,
+                    $or: [{ userId: null }, { userId: { $exists: false } }]
+                }).sort({ updatedAt: -1 });
+
+                if (guestConv) {
+                    guestConv.userId = userId;
+                    await guestConv.save();
+                    conversation = guestConv;
+                }
+            }
+        } else if (hasGuestId) {
+            // Khách vãng lai: Chỉ tìm hội thoại của guestId mà userId đang là null
+            conversation = await ChatConversation.findOne({
+                guestId,
+                $or: [{ userId: null }, { userId: { $exists: false } }]
+            }).sort({ updatedAt: -1 });
+        }
 
         if (!conversation) {
             // Nếu chưa có, trả về mảng rỗng để frontend hiển thị giao diện bắt đầu
@@ -41,7 +58,8 @@ exports.getChatHistory = async (req, res) => {
 
         res.status(200).json({ success: true, messages: conversation.messages, status: conversation.status });
     } catch (error) {
-        throw error;
+        console.error("Lỗi khi lấy lịch sử chat:", error);
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 

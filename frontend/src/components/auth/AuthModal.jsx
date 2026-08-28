@@ -130,6 +130,7 @@ const AuthModal = () => {
         
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('userInfo', JSON.stringify(response.data.user));
+        window.dispatchEvent(new Event('authChange'));
         
         loadUserCart(response.data.user._id);
         toast.success('Đăng nhập thành công!');
@@ -244,6 +245,7 @@ const AuthModal = () => {
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('userInfo', JSON.stringify(response.data.user));
+      window.dispatchEvent(new Event('authChange'));
 
       loadUserCart(response.data.user._id);
       toast.success('Xác thực thành công! Đang đăng nhập...');
@@ -280,6 +282,7 @@ const AuthModal = () => {
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('userInfo', JSON.stringify(response.data.user));
+      window.dispatchEvent(new Event('authChange'));
 
       loadUserCart(response.data.user._id);
       toast.success('Đăng nhập Google thành công!');

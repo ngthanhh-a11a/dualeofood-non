@@ -90,34 +90,58 @@ io.on('connection', (socket) => {
         const { guestId, userId, customerName, content } = data;
 
         try {
-            // Tìm cuộc hội thoại theo guestId trước (vì guestId cố định trên trình duyệt)
-            let conversation = await ChatConversation.findOne({ guestId });
+            let conversation = null;
 
-            // Nếu không có theo guestId, tìm theo userId (trường hợp đăng nhập trên thiết bị mới)
-            if (!conversation && userId) {
+            if (userId) {
+                // 1. Tìm theo userId trước
                 conversation = await ChatConversation.findOne({ userId });
+
+                // 2. Nếu chưa có, kiểm tra xem có phiên guest (chưa thuộc về userId khác) hay không
+                if (!conversation && guestId) {
+                    conversation = await ChatConversation.findOne({
+                        guestId,
+                        $or: [{ userId: null }, { userId: { $exists: false } }]
+                    });
+                    if (conversation) {
+                        conversation.userId = userId;
+                    }
+                }
+
+                // 3. Nếu vẫn không có, tạo mới cho userId
+                if (!conversation) {
+                    conversation = new ChatConversation({
+                        guestId: guestId || null,
+                        userId: userId,
+                        customerName: customerName || 'Khách hàng',
+                        status: 'active'
+                    });
+                }
+            } else {
+                // Dành cho Guest vãng lai
+                if (guestId) {
+                    conversation = await ChatConversation.findOne({
+                        guestId,
+                        $or: [{ userId: null }, { userId: { $exists: false } }]
+                    });
+                }
+
+                if (!conversation) {
+                    conversation = new ChatConversation({
+                        guestId: guestId || null,
+                        userId: null,
+                        customerName: customerName || 'Khách hàng',
+                        status: 'active'
+                    });
+                }
             }
 
-            if (!conversation) {
-                conversation = new ChatConversation({
-                    guestId: guestId || null,
-                    userId: userId || null,
-                    customerName: customerName || 'Khách hàng',
-                    status: 'active'
-                });
-            } else {
-                // Cập nhật thông tin khách hàng nếu họ vừa đăng nhập
-                if (userId && !conversation.userId) {
-                    conversation.userId = userId;
-                }
-                // Ưu tiên tên thật nếu có
-                if (customerName && customerName !== 'Khách hàng') {
-                    conversation.customerName = customerName;
-                }
+            // Cập nhật thông tin bổ sung nếu cần
+            if (customerName && customerName !== 'Khách hàng') {
+                conversation.customerName = customerName;
+            }
 
-                if (conversation.status === 'closed') {
-                    conversation.status = 'active'; // Mở lại nếu đã đóng
-                }
+            if (conversation.status === 'closed') {
+                conversation.status = 'active'; // Mở lại nếu đã đóng
             }
 
             const newMessage = {

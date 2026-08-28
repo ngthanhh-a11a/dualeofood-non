@@ -23,27 +23,38 @@ const CustomerChatWidget = () => {
   const isHidden = location.pathname.startsWith('/admin') || location.pathname.startsWith('/staff');
 
   useEffect(() => {
-    // 1. Khởi tạo định danh người dùng
-    const userStr = localStorage.getItem('userInfo');
     let currentUserId = null;
-    if (userStr) {
-      try {
-        const userObj = JSON.parse(userStr);
-        currentUserId = userObj.id || userObj._id;
-        setUserId(currentUserId);
-        setUserAvatar(userObj.avatar || null);
-      } catch (e) {}
-    }
+    let currentGuestId = null;
 
-    let currentGuestId = localStorage.getItem('chat_guest_id');
-    if (!currentUserId && !currentGuestId) {
-      currentGuestId = 'guest_' + Math.random().toString(36).substring(2, 15);
-      localStorage.setItem('chat_guest_id', currentGuestId);
-    }
-    setGuestId(currentGuestId);
+    const loadSessionAndHistory = async () => {
+      // 1. Khởi tạo định danh người dùng
+      const userStr = localStorage.getItem('userInfo');
+      if (userStr) {
+        try {
+          const userObj = JSON.parse(userStr);
+          currentUserId = userObj.id || userObj._id;
+          setUserId(currentUserId);
+          setUserAvatar(userObj.avatar || null);
+        } catch (e) {
+          setUserId(null);
+          setUserAvatar(null);
+        }
+      } else {
+        setUserId(null);
+        setUserAvatar(null);
+      }
 
-    // 2. Load lịch sử tin nhắn
-    const fetchHistory = async () => {
+      currentGuestId = localStorage.getItem('chat_guest_id');
+      if (!currentUserId && !currentGuestId) {
+        currentGuestId = 'guest_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem('chat_guest_id', currentGuestId);
+      }
+      setGuestId(currentGuestId);
+
+      // Reset danh sách tin nhắn trước khi tải tin nhắn của phiên mới
+      setMessages([]);
+
+      // 2. Load lịch sử tin nhắn
       try {
         const url = `/chats/history?userId=${currentUserId || 'null'}&guestId=${currentGuestId || 'null'}`;
         const res = await axios.get(url);
@@ -53,22 +64,38 @@ const CustomerChatWidget = () => {
       } catch (error) {
         console.error("Lỗi tải lịch sử chat:", error);
       }
+
+      if (socket) {
+        socket.emit('join_chat', { guestId: currentGuestId, userId: currentUserId });
+      }
     };
-    fetchHistory();
 
-    if (!socket) return;
+    loadSessionAndHistory();
 
-    socket.emit('join_chat', { guestId: currentGuestId, userId: currentUserId });
+    const handleAuthChange = () => {
+      loadSessionAndHistory();
+    };
 
-    socket.on('receive_message', (msg) => {
+    window.addEventListener('authChange', handleAuthChange);
+
+    if (!socket) {
+      return () => {
+        window.removeEventListener('authChange', handleAuthChange);
+      };
+    }
+
+    const handleReceiveMessage = (msg) => {
       setMessages(prev => {
         if (prev.some(m => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
-    });
+    };
+
+    socket.on('receive_message', handleReceiveMessage);
 
     return () => {
-      socket.off('receive_message');
+      window.removeEventListener('authChange', handleAuthChange);
+      socket.off('receive_message', handleReceiveMessage);
     };
   }, [socket]);
 
@@ -96,11 +123,20 @@ const CustomerChatWidget = () => {
     };
     setMessages(prev => [...prev, tempMessage]);
 
+    let customerName = 'Khách hàng';
+    try {
+      const userStr = localStorage.getItem('userInfo');
+      if (userStr) {
+        const userObj = JSON.parse(userStr);
+        customerName = userObj.name || userObj.fullName || 'Khách hàng';
+      }
+    } catch (e) {}
+
     // Emit qua Socket
     socket.emit('customer_send_message', {
       guestId,
       userId,
-      customerName: userId ? JSON.parse(localStorage.getItem('userInfo')).name : 'Khách hàng',
+      customerName,
       content: inputMessage
     });
 

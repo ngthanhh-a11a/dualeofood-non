@@ -136,13 +136,16 @@ const Header = () => {
     } catch (error) { console.error('Lỗi khi đánh dấu tất cả đã đọc', error); }
   };
 
-  // 3. Hàm xử lý Đăng xuất
   const handleLogout = () => {
     // 1. Xóa thông tin đăng nhập khỏi localStorage TRƯỚC.
     // Điều này đảm bảo giỏ hàng trống (sau khi clear) sẽ được lưu vào 'cart_anonymous'
     // thay vì ghi đè lên giỏ hàng đã lưu của người dùng.
     localStorage.removeItem('token');
     localStorage.removeItem('userInfo');
+    localStorage.removeItem('chat_guest_id');
+
+    // Thông báo sự kiện thay đổi auth cho các component như CustomerChatWidget lắng nghe
+    window.dispatchEvent(new Event('authChange'));
 
     // 2. Xóa giỏ hàng khỏi Redux. Middleware sẽ tự động lưu giỏ hàng trống này.
     dispatch(clearCart());
