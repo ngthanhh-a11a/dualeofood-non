@@ -61,8 +61,8 @@ ${systemInstruction}
 Khách hàng nhắn: "${userMessage}"
 Bạn (AI Trợ Lý) trả lời:`;
 
-    // Danh sách các model thử nghiệm theo thứ tự ưu tiên
-    const candidateModels = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-pro"];
+    // Danh sách các model thử nghiệm theo thứ tự ưu tiên (Gemini API 2026 khuyến nghị gemini-3.6-flash)
+    const candidateModels = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash"];
     let lastError = null;
 
     for (const modelName of candidateModels) {
