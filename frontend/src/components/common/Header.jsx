@@ -22,6 +22,7 @@ const Header = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const socket = useSocket();
   const notifRef = useRef(null); // Để xử lý click bên ngoài dropdown
+  const userMenuRef = useRef(null); // Để xử lý click bên ngoài dropdown menu user
   // --- END: STATE VÀ LOGIC CHO HỆ THỐNG THÔNG BÁO ---
   
   // 1. Lấy thông tin giỏ hàng từ Redux
@@ -96,6 +97,9 @@ const Header = () => {
     const handleClickOutside = (event) => {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -289,10 +293,9 @@ const Header = () => {
           <div className="border-l-2 pl-3 sm:pl-6 border-sky-50 flex items-center">
             {userInfo ? (
               // Trạng thái 1: ĐÃ ĐĂNG NHẬP
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button 
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  onBlur={() => setTimeout(() => setIsUserMenuOpen(false), 200)} // Thêm onBlur để tự đóng khi click ra ngoài
                   className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 transition"
                 >
                   {userInfo?.avatar ? (
@@ -312,17 +315,57 @@ const Header = () => {
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-50 z-50 animate-fade-in-down py-2">
                     {userInfo?.role === 'admin' && (
-                      <Link to="/admin" className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-orange-500 hover:bg-orange-50">
+                      <Link 
+                        to="/admin" 
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-orange-500 hover:bg-orange-50"
+                      >
                         ⚙️ Quản trị
                       </Link>
                     )}
-                    <Link to="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">👤 Hồ sơ cá nhân</Link>
-                    <Link to="/my-addresses" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">📍 Địa chỉ của tôi</Link>
-                    <Link to="/my-orders" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">📦 Đơn hàng của tôi</Link>
-                    <Link to="/wallet" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">🎟️ Kho Voucher</Link>
-                    <Link to="/my-reviews" className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">📝 Đánh giá của tôi</Link>
+                    <Link 
+                      to="/profile" 
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      👤 Hồ sơ cá nhân
+                    </Link>
+                    <Link 
+                      to="/my-addresses" 
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      📍 Địa chỉ của tôi
+                    </Link>
+                    <Link 
+                      to="/my-orders" 
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      📦 Đơn hàng của tôi
+                    </Link>
+                    <Link 
+                      to="/wallet" 
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      🎟️ Kho Voucher
+                    </Link>
+                    <Link 
+                      to="/my-reviews" 
+                      onClick={() => setIsUserMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      📝 Đánh giá của tôi
+                    </Link>
                     <div className="border-t my-2"></div>
-                    <button onClick={handleLogout} className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50">
+                    <button 
+                      onClick={() => {
+                        setIsUserMenuOpen(false);
+                        handleLogout();
+                      }} 
+                      className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50"
+                    >
                       Đăng xuất
                     </button>
                   </div>
