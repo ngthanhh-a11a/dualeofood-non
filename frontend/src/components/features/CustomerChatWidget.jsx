@@ -43,20 +43,34 @@ const CustomerChatWidget = () => {
       const rect = dragRef.current.getBoundingClientRect();
       const elementCenterX = rect.left + rect.width / 2;
       const isLeft = elementCenterX < window.innerWidth / 2;
+      const isMobile = window.innerWidth < 768;
 
-      const headerEl = document.querySelector('header');
-      const headerBottom = headerEl ? Math.max(0, headerEl.getBoundingClientRect().bottom) : 70;
-      const chatHeight = 500;
-      const minTop = headerBottom + 16;
-      const maxTop = Math.max(minTop, window.innerHeight - chatHeight - 16);
+      if (isMobile) {
+        // Trên mobile: Luôn neo cố định phía trên thanh Bottom Nav để không bị tràn/mất ô nhập tin nhắn
+        setChatPosition({
+          side: isLeft ? 'left' : 'right',
+          top: null,
+        });
+      } else {
+        const headerEl = document.querySelector('header');
+        const headerBottom = headerEl ? Math.max(0, headerEl.getBoundingClientRect().bottom) : 70;
+        const chatHeight = 500;
+        const minTop = headerBottom + 16;
+        const maxTop = Math.max(minTop, window.innerHeight - chatHeight - 16);
 
-      // Canh khung chat theo độ cao hiện tại của nhân vật
-      let targetTop = rect.top - 10;
-      targetTop = Math.max(minTop, Math.min(maxTop, targetTop));
+        // Canh khung chat theo độ cao hiện tại của nhân vật trên Desktop
+        let targetTop = rect.top - 10;
+        targetTop = Math.max(minTop, Math.min(maxTop, targetTop));
 
+        setChatPosition({
+          side: isLeft ? 'left' : 'right',
+          top: Math.round(targetTop),
+        });
+      }
+    } else {
       setChatPosition({
-        side: isLeft ? 'left' : 'right',
-        top: Math.round(targetTop),
+        side: 'right',
+        top: null,
       });
     }
     setIsOpen(true);
@@ -77,8 +91,8 @@ const CustomerChatWidget = () => {
     const headerEl = document.querySelector('header');
     const headerBottom = headerEl ? Math.max(0, headerEl.getBoundingClientRect().bottom) : 70;
     const topSafePadding = 12; // Cách đáy header 12px
-    const sidePadding = 12;    // Cách 2 bên mép màn hình 12px
-    const bottomPadding = 16;  // Cách mép dưới màn hình 16px
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    const bottomPadding = isMobile ? 80 : 16;  // Tránh bị thanh bottom navigation che lấp trên mobile
 
     const minX = sidePadding - origLeft;
     const maxX = window.innerWidth - sidePadding - origRight;
@@ -423,31 +437,32 @@ const CustomerChatWidget = () => {
         </div>
       )}
 
-      {/* Cửa sổ Chat - Mở ngay tại vị trí mép và độ cao của nhân vật */}
+      {/* Cửa sổ Chat - Tối ưu hiển thị cho cả Desktop và Mobile */}
       {isOpen && (
         <div
-          className={`fixed z-50 transition-all duration-300 ${chatPosition.side === 'left' ? 'left-4 md:left-6' : 'right-4 md:right-6'
-            }`}
+          className={`fixed z-[1000] transition-all duration-300 ${
+            chatPosition.side === 'left' ? 'left-3 md:left-6' : 'right-3 md:right-6'
+          } ${chatPosition.top === null ? 'bottom-20 md:bottom-6' : ''}`}
           style={{
             top: chatPosition.top !== null ? `${chatPosition.top}px` : undefined,
-            bottom: chatPosition.top === null ? '24px' : undefined,
           }}
         >
           <div className="relative">
             {/* Mascot ngồi trên nóc khung chat tương ứng mép trái/phải */}
-            <div className={`absolute -top-16 ${chatPosition.side === 'left' ? 'left-6' : 'right-6'} z-20 drop-shadow-xl pointer-events-auto`}>
+            <div className={`absolute -top-14 md:-top-16 ${chatPosition.side === 'left' ? 'left-4 md:left-6' : 'right-4 md:right-6'} z-20 drop-shadow-xl pointer-events-auto`}>
               <Mascot
                 directions="/mascots/toaster-directions.webp"
                 reactions="/mascots/toaster-reactions.webp"
-                size={85}
+                size={72}
                 label="Hỗ trợ viên Toaster"
               />
             </div>
 
-            <div className={`bg-white rounded-2xl shadow-2xl w-[calc(100vw-2rem)] md:w-[350px] h-[60vh] md:h-[500px] flex flex-col overflow-hidden border border-slate-200 transition-all duration-300 transform ${chatPosition.side === 'left' ? 'origin-top-left md:origin-bottom-left' : 'origin-top-right md:origin-bottom-right'
-              }`}>
+            <div className={`bg-white rounded-2xl shadow-2xl w-[calc(100vw-1.5rem)] max-w-[360px] md:w-[350px] h-[65vh] max-h-[500px] md:h-[500px] flex flex-col overflow-hidden border border-slate-200 transition-all duration-300 transform ${
+              chatPosition.side === 'left' ? 'origin-bottom-left md:origin-top-left' : 'origin-bottom-right md:origin-top-right'
+            }`}>
               {/* Header tông màu slate theo Mascot */}
-              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white flex justify-between items-center shadow-md border-b border-slate-700/60">
+              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white flex justify-between items-center shadow-md border-b border-slate-700/60 flex-shrink-0">
                 <div className="flex items-center gap-2.5">
                   {/* Mặt nhân vật Toaster tĩnh (nhìn thẳng, không theo chuột) */}
                   <div
@@ -474,7 +489,7 @@ const CustomerChatWidget = () => {
               </div>
 
               {/* Messages Area */}
-              <div className="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-3">
+              <div className="flex-1 min-h-0 p-4 overflow-y-auto bg-slate-50 space-y-3">
                 {messages.length === 0 ? (
                   <div className="text-center text-gray-400 mt-10 text-sm">
                     <p>Chưa có tin nhắn nào.</p>
@@ -514,7 +529,7 @@ const CustomerChatWidget = () => {
               </div>
 
               {/* Input Area */}
-              <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-slate-100 flex items-center gap-2">
+              <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-slate-100 flex items-center gap-2 flex-shrink-0">
                 <input
                   type="text"
                   value={inputMessage}

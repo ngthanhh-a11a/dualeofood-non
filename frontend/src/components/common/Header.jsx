@@ -632,7 +632,7 @@ const Header = () => {
         </div>
 
         {/* ================= MENU ĐIỀU HƯỚNG VỚI HIỆU ỨNG RUBBER SEGMENT (REACT BITS) ================= */}
-        <nav className="flex items-center" aria-label="Menu điều hướng chính">
+        <nav className="hidden lg:flex items-center" aria-label="Menu điều hướng chính">
           <RubberSegment
             items={navItems}
             value={currentNavValue}

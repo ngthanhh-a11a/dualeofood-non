@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 /* Custom sleek scrollbar for voucher list & containers */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
