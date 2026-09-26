@@ -2,9 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  overflow-x: hidden;
-  max-width: 100%;
+html {
+  overflow-x: clip;
 }
 
 /* Custom sleek scrollbar for voucher list & containers */
