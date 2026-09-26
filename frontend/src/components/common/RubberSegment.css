@@ -124,3 +124,31 @@
     transition: opacity 160ms ease;
   }
 }
+
+/* Responsive Compact Styling for Mobile & Tablet (Thu gọn 6 icons vừa khít màn hình) */
+@media (max-width: 639px) {
+  .rubber-segment {
+    --rs-h: 28px !important;
+    --rs-pad: 2px !important;
+    --rs-min: 26px !important;
+    --rs-inset: 1px !important;
+  }
+  .rubber-segment__item {
+    gap: 0 !important;
+    padding: 0 2px !important;
+    min-width: 26px !important;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .rubber-segment {
+    --rs-h: 32px !important;
+    --rs-pad: 6px !important;
+    --rs-min: 32px !important;
+    --rs-inset: 2px !important;
+  }
+  .rubber-segment__item {
+    padding: 0 6px !important;
+    min-width: 32px !important;
+  }
+}

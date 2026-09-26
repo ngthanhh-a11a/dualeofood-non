@@ -223,7 +223,7 @@ const Header = () => {
           Trang chủ
         </span>
       ),
-      icon: <FiHome className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+      icon: <FiHome className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-4.5 xl:h-4.5 flex-shrink-0" />
     },
     {
       value: '/about',
@@ -232,7 +232,7 @@ const Header = () => {
           Giới thiệu
         </span>
       ),
-      icon: <FiInfo className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+      icon: <FiInfo className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-4.5 xl:h-4.5 flex-shrink-0" />
     },
     {
       value: '/menu',
@@ -241,7 +241,7 @@ const Header = () => {
           Thực đơn
         </span>
       ),
-      icon: <FiBookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+      icon: <FiBookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-4.5 xl:h-4.5 flex-shrink-0" />
     },
     {
       value: '/blog',
@@ -250,7 +250,7 @@ const Header = () => {
           Bài viết
         </span>
       ),
-      icon: <FiFileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+      icon: <FiFileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-4.5 xl:h-4.5 flex-shrink-0" />
     },
     {
       value: '/promotions',
@@ -259,7 +259,7 @@ const Header = () => {
           Khuyến Mãi
         </span>
       ),
-      icon: <FiTag className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+      icon: <FiTag className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-4.5 xl:h-4.5 flex-shrink-0" />
     },
     {
       value: '/contact',
@@ -268,7 +268,7 @@ const Header = () => {
           Liên hệ
         </span>
       ),
-      icon: <FiPhone className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+      icon: <FiPhone className="w-3.5 h-3.5 sm:w-4 sm:h-4 xl:w-4.5 xl:h-4.5 flex-shrink-0" />
     },
   ];
 
@@ -604,7 +604,7 @@ const Header = () => {
         .user-sidebar-panel-top::-webkit-scrollbar-track { background: #f8fafc; border-radius: 999px; }
         .user-sidebar-panel-top::-webkit-scrollbar-thumb { background: #bae6fd; border-radius: 999px; }
       `}</style>
-      <div className="container mx-auto px-4 py-3 sm:py-4 flex justify-between items-center">
+      <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex justify-between items-center gap-1 sm:gap-2">
         
         {/* ================= LOGO & TÊN THƯƠNG HIỆU (Hover hiện chữ dưới logo kiểu About) ================= */}
         <div className="relative group/logo flex-shrink-0 flex items-center justify-center">
@@ -632,7 +632,7 @@ const Header = () => {
         </div>
 
         {/* ================= MENU ĐIỀU HƯỚNG VỚI HIỆU ỨNG RUBBER SEGMENT (REACT BITS) ================= */}
-        <nav className="hidden lg:flex items-center" aria-label="Menu điều hướng chính">
+        <nav className="flex items-center justify-center shrink min-w-0" aria-label="Menu điều hướng chính">
           <RubberSegment
             items={navItems}
             value={currentNavValue}
@@ -642,11 +642,11 @@ const Header = () => {
             textColor="#475569"
             activeTextColor="#0284c7"
             size="md"
-            radius={12}
+            radius={10}
             inset={0}
             equalSlots={false}
-            stretch={75}
-            squash={3}
+            stretch={50}
+            squash={2}
             speed={1}
             glide={65}
             draggable={true}
@@ -656,7 +656,7 @@ const Header = () => {
         </nav>
 
         {/* ================= KHU VỰC CÔNG CỤ & TÀI KHOẢN ================= */}
-        <div className="flex items-center space-x-2 sm:space-x-4 xl:space-x-6">
+        <div className="flex items-center space-x-1 sm:space-x-3 xl:space-x-6 shrink-0">
           
           {/* Nút Giỏ Hàng (Icon trơn không ô vuông bọc ngoài, số lượng hình tròn chuẩn 100%, cách xa nút hồ sơ) */}
           <div className="hidden md:flex relative group/cart items-center justify-center mr-3 sm:mr-4">
