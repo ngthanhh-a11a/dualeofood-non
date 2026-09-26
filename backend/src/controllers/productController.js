@@ -228,6 +228,14 @@ const createProductReview = asyncHandler(async (req, res) => {
                 : 0;
 
             await product.save();
+
+            if (req.io) {
+                req.io.to('admin_room').emit('new_admin_notification', {
+                    type: 'NEW_REVIEW',
+                    message: `Khách hàng ${user.name} vừa gửi đánh giá ${rating}⭐ cho món "${product.name}"`
+                });
+            }
+
             res.status(201).json({ message: 'Đánh giá đã được thêm thành công' });
 
         } else {
@@ -371,4 +379,17 @@ const toggleProductReviewPin = asyncHandler(async (req, res) => {
 });
 
 // NHỚ XUẤT ĐÚNG TÊN HÀM Ở ĐÂY THÌ BÊN ROUTE MỚI ĐỌC ĐƯỢC
-module.exports = { createProduct, getProducts, deleteProduct, updateProduct, getProductById, createProductReview, getProductReviewStats, pinProduct, getPinnedProducts, toggleProductReviewVisibility, getAllProductReviews, toggleProductReviewPin };
+module.exports = { 
+    createProduct, 
+    getProducts, 
+    deleteProduct, 
+    updateProduct, 
+    getProductById, 
+    createProductReview, 
+    getProductReviewStats, 
+    pinProduct, 
+    getPinnedProducts, 
+    toggleProductReviewVisibility, 
+    getAllProductReviews, 
+    toggleProductReviewPin
+};

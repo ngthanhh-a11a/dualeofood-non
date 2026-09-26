@@ -1,18 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { clearCart } from '../../redux/cartSlice'; // Import action clearCart
 import { openAuthModal } from '../../redux/uiSlice'; // Import action mở popup login
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig'; // Import axios và SERVER_URL
+import RubberSegment from './RubberSegment';
 import logoImage from '../../assets/logo.png';
-import { FaBell } from 'react-icons/fa'; // Icon chuông
-import { FiHome, FiList, FiShoppingBag, FiUser } from 'react-icons/fi'; // Icon Bottom Nav
+import { 
+  FiHome, FiInfo, FiBookOpen, FiFileText, FiTag, FiPhone, 
+  FiList, FiShoppingBag, FiUser, FiCopy, FiCheck, FiGift, 
+  FiArrowRight, FiSearch, FiBookmark, FiPercent, FiShoppingCart, FiBell,
+  FiHeadphones
+} from 'react-icons/fi'; // Icons Header & Bottom Nav & Voucher & Support
 import { useSocket } from '../../contexts/SocketContext'; // Lắng nghe real-time
 import { formatDistanceToNow } from 'date-fns'; // Hiển thị "5 phút trước"
 import { vi } from 'date-fns/locale'; // Ngôn ngữ Tiếng Việt
+import toast from 'react-hot-toast';
 
 const Header = () => {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // State cho dropdown của user
   const navigate = useNavigate();
   const location = useLocation(); // Lấy vị trí hiện tại
@@ -22,8 +27,12 @@ const Header = () => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const socket = useSocket();
   const notifRef = useRef(null); // Để xử lý click bên ngoài dropdown
-  const userMenuRef = useRef(null); // Để xử lý click bên ngoài dropdown menu user
   // --- END: STATE VÀ LOGIC CHO HỆ THỐNG THÔNG BÁO ---
+
+  // --- START: STATE CHO SỐ LƯỢNG VOUCHER ---
+  const [voucherCount, setVoucherCount] = useState(0);
+  // --- END: STATE CHO SỐ LƯỢNG VOUCHER ---
+
   
   // 1. Lấy thông tin giỏ hàng từ Redux
   // Thêm fallback an toàn trong trường hợp state.cart chưa khởi tạo
@@ -92,19 +101,52 @@ const Header = () => {
     };
   }, [userInfo?._id, userInfo?.role, socket]); // Thêm role vào dependency array
 
-  // 4. Đóng dropdown khi click ra ngoài
+  // 4. Đóng dropdown thông báo khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
       }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
-        setIsUserMenuOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Đóng mở User Sidebar Drawer thông thường
+  // ─────────────────────────────────────────────────────────────────────
+  const openUserSidebar = () => {
+    setIsUserMenuOpen(true);
+  };
+
+  const closeUserSidebar = () => {
+    setIsUserMenuOpen(false);
+  };
+
+  // Đóng sidebar khi nhấn Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isUserMenuOpen) {
+        setIsUserMenuOpen(false);
+        document.getElementById('user-account-btn')?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isUserMenuOpen]);
+
+  // Lấy số lượng voucher khả dụng trong ví người dùng
+  useEffect(() => {
+    if (!userInfo) return;
+    axios.get('/vouchers/my-vouchers')
+      .then(res => {
+        const raw = res?.data;
+        const list = Array.isArray(raw) ? raw : (raw?.data || raw?.vouchers || []);
+        const activeList = list.filter(v => !v.isUsed && v.coupon && v.coupon.isActive && new Date(v.coupon.expiryDate) >= new Date());
+        setVoucherCount(activeList.length);
+      })
+      .catch(() => {});
+  }, [userInfo?._id, isUserMenuOpen]);
 
   // 5. Tính toán số thông báo chưa đọc (chấm đỏ)
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -126,9 +168,13 @@ const Header = () => {
     // 2. Đóng dropdown
     setIsNotifOpen(false);
 
-    // 3. Nếu là thông báo đơn hàng, điều hướng tới trang MyOrders với state
-    if (notif.type === 'ORDER_UPDATE' && notif.orderId) {
+    // 3. Điều hướng theo liên kết hoặc loại thông báo
+    if (notif.link) {
+      navigate(notif.link);
+    } else if (notif.type === 'ORDER_UPDATE' && notif.orderId) {
       navigate('/my-orders', { state: { scrollToOrderId: notif.orderId } });
+    } else if (notif.type && notif.type.startsWith('ARTICLE_')) {
+      navigate('/blog');
     }
   };
 
@@ -158,331 +204,913 @@ const Header = () => {
     navigate('/');
   };
 
-  const navLinks = [
-    { path: '/', text: 'Trang chủ' },
-    { path: '/about', text: 'Giới thiệu' },
-    { path: '/menu', text: 'Thực đơn' },
-    { path: '/blog', text: 'Bài viết' },
-    { path: '/promotions', text: 'Khuyến Mãi' },
-    { path: '/contact', text: 'Liên hệ' },
+  const currentNavValue = useMemo(() => {
+    const p = location.pathname;
+    if (p === '/') return '/';
+    if (p.startsWith('/about')) return '/about';
+    if (p.startsWith('/menu') || p.startsWith('/product')) return '/menu';
+    if (p.startsWith('/blog')) return '/blog';
+    if (p.startsWith('/promotions')) return '/promotions';
+    if (p.startsWith('/contact')) return '/contact';
+    return '';
+  }, [location.pathname]);
+
+  const navItems = [
+    {
+      value: '/',
+      label: (
+        <span className="hidden xl:inline text-xs xl:text-sm font-bold whitespace-nowrap">
+          Trang chủ
+        </span>
+      ),
+      icon: <FiHome className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+    },
+    {
+      value: '/about',
+      label: (
+        <span className="hidden xl:inline text-xs xl:text-sm font-bold whitespace-nowrap">
+          Giới thiệu
+        </span>
+      ),
+      icon: <FiInfo className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+    },
+    {
+      value: '/menu',
+      label: (
+        <span className="hidden xl:inline text-xs xl:text-sm font-bold whitespace-nowrap">
+          Thực đơn
+        </span>
+      ),
+      icon: <FiBookOpen className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+    },
+    {
+      value: '/blog',
+      label: (
+        <span className="hidden xl:inline text-xs xl:text-sm font-bold whitespace-nowrap">
+          Bài viết
+        </span>
+      ),
+      icon: <FiFileText className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+    },
+    {
+      value: '/promotions',
+      label: (
+        <span className="hidden xl:inline text-xs xl:text-sm font-bold whitespace-nowrap">
+          Khuyến Mãi
+        </span>
+      ),
+      icon: <FiTag className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+    },
+    {
+      value: '/contact',
+      label: (
+        <span className="hidden xl:inline text-xs xl:text-sm font-bold whitespace-nowrap">
+          Liên hệ
+        </span>
+      ),
+      icon: <FiPhone className="w-4 h-4 sm:w-4.5 sm:h-4.5 flex-shrink-0" />
+    },
   ];
 
-  // Hàm điều hướng đáng tin cậy trên Mobile
-  const handleMobileNav = (path) => {
-    setIsMobileMenuOpen(false);
-    navigate(path);
+  const handleNavChange = (newPath) => {
+    if (newPath && newPath !== location.pathname) {
+      navigate(newPath);
+    }
   };
 
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50 font-sans">
-      {/* Thêm định nghĩa keyframes cho hiệu ứng shake, có thể chuyển vào file CSS chung */}
+    <>
+      <header className="bg-white shadow-xs sticky top-0 z-40 font-sans">
       <style>{`
-        .animate-fade-in-down { animation: fade-in-down 0.3s ease-out forwards; } 
+        .animate-fade-in-down { animation: fade-in-down 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; } 
         @keyframes fade-in-down { 
-            from { opacity: 0; transform: translateY(-10px); } 
+            from { opacity: 0; transform: translateY(-8px); } 
             to { opacity: 1; transform: translateY(0); } 
         }
         .shake { animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both; }
-      `}</style>
-      <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-        
-        {/* ================= LOGO & TÊN THƯƠNG HIỆU ================= */}
-        <Link to="/" className="flex items-center gap-1 sm:gap-2 hover:scale-105 transition transform flex-shrink-0">
-          <img 
-            src={logoImage} 
-            alt="DualeoFood Logo" 
-            className="w-8 h-8 sm:w-10 sm:h-10 object-contain"
-            onError={(e) => { e.target.onerror = null; e.target.src = "https://ui-avatars.com/api/?name=DF&background=0EA5E9&color=fff&rounded=true&bold=true"; }}
-          />
-          <span className="text-lg sm:text-2xl lg:text-3xl font-black text-sky-500 tracking-wider whitespace-nowrap">
-            DUALEOFOOD
-          </span>
-        </Link>
 
-        {/* ================= MENU ĐIỀU HƯỚNG (Chỉ hiện trên màn hình lớn) ================= */}
-        <nav className="hidden lg:flex items-center space-x-8 font-bold text-gray-600">
-          {navLinks.map((link) => (
-            <Link
-              key={link.path}
-              to={link.path}
-              className={`relative transition-colors duration-300 pb-1 after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-full after:h-0.5 after:bg-sky-500 after:transition-transform after:duration-300 after:ease-out ${
-                location.pathname === link.path ? 'text-sky-500 after:scale-x-100' : 'text-gray-600 after:scale-x-0 hover:text-sky-500 hover:after:scale-x-100'
-              }`}
-            >
-              {link.text}
-            </Link>
-          ))}
+        /* Scrollbar tinh tế cho thông báo */
+        .custom-notif-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-notif-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-notif-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .custom-notif-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* ── User Sidebar Drawer CSS ── */
+        #user-sidebar-drawer {
+          position: fixed;
+          inset: 0;
+          z-index: 300;
+          padding: 0.75rem;
+          pointer-events: none;
+          visibility: hidden;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.6rem;
+          overflow-x: hidden;
+          overflow-y: auto;
+          transition: visibility 0.65s ease;
+        }
+        @media (min-width: 640px) {
+          #user-sidebar-drawer {
+            padding: 1.25rem;
+            gap: 0.75rem;
+          }
+        }
+        #user-sidebar-drawer {
+          position: fixed;
+          inset: 0;
+          z-index: 300;
+          padding: 0.75rem;
+          pointer-events: none;
+          visibility: hidden;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.6rem;
+          overflow-x: hidden;
+          overflow-y: auto;
+          transition: visibility 0.45s ease;
+        }
+        @media (min-width: 640px) {
+          #user-sidebar-drawer {
+            padding: 1.25rem;
+            gap: 0.75rem;
+          }
+        }
+        #user-sidebar-drawer.open {
+          visibility: visible;
+          pointer-events: auto;
+          transition: visibility 0s ease;
+        }
+        .user-sidebar-bg {
+          position: fixed;
+          inset: 0;
+          z-index: 1;
+          background: rgba(15, 23, 42, 0.4);
+          backdrop-filter: blur(3px);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #user-sidebar-drawer.open .user-sidebar-bg {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .user-sidebar-panel {
+          max-width: 420px;
+          width: 100%;
+          border-radius: 20px;
+          position: relative;
+          z-index: 10;
+          pointer-events: auto;
+          transform: translateX(110%);
+          opacity: 0;
+          border: none;
+          user-select: none;
+          will-change: transform, opacity;
+          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+        }
+
+        /* Khi đóng/thoát ra: Top và Bottom trượt ra êm ái theo đường cong tự nhiên */
+        .user-sidebar-panel-top {
+          background: #ffffff;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.06);
+          flex: 1;
+          overflow-y: auto;
+          padding: 1.25rem 1.5rem;
+          display: flex;
+          flex-direction: column;
+          max-height: calc(90vh - 80px);
+          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition-delay: 0s;
+        }
+        .user-sidebar-panel-bottom {
+          background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+          box-shadow: 0 10px 30px rgba(2, 132, 199, 0.28), 0 2px 10px rgba(0,0,0,0.06);
+          padding: 0.875rem 1.25rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          min-height: 64px;
+          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition-delay: 0.08s;
+        }
+
+        /* ── Animated Logout Button ── */
+        .Btn-logout {
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          width: 44px;
+          height: 44px;
+          border: none;
+          border-radius: 50%;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+          transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease, border-radius 0.18s ease;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          background-color: rgb(255, 65, 65);
+          flex-shrink: 0;
+        }
+
+        .Btn-logout .sign {
+          width: 100%;
+          transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1), padding 0.18s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .Btn-logout .sign svg {
+          width: 17px;
+          height: 17px;
+        }
+
+        .Btn-logout .sign svg path {
+          fill: white;
+        }
+
+        .Btn-logout .text {
+          position: absolute;
+          right: 0%;
+          width: 0%;
+          opacity: 0;
+          color: white;
+          font-size: 13.5px;
+          font-weight: 600;
+          white-space: nowrap;
+          transition: opacity 0.15s ease, width 0.18s cubic-bezier(0.16, 1, 0.3, 1), padding 0.18s ease;
+        }
+
+        .Btn-logout:hover {
+          width: 135px;
+          border-radius: 40px;
+          background-color: rgb(240, 45, 45);
+        }
+
+        .Btn-logout:hover .sign {
+          width: 30%;
+          padding-left: 14px;
+        }
+
+        .Btn-logout:hover .text {
+          opacity: 1;
+          width: 70%;
+          padding-right: 12px;
+        }
+
+        .Btn-logout:active {
+          transform: scale(0.96);
+        }
+
+        /* ── Animated Support Button (Tương tự Logout, màu xanh ngọc Emerald) ── */
+        .Btn-support {
+          display: flex;
+          align-items: center;
+          justify-content: flex-start;
+          width: 44px;
+          height: 44px;
+          border: none;
+          border-radius: 50%;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+          transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.18s ease, border-radius 0.18s ease;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+          background-color: #10b981;
+          flex-shrink: 0;
+          text-decoration: none;
+        }
+
+        .Btn-support .sign {
+          width: 100%;
+          transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1), padding 0.18s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+
+        .Btn-support .sign svg {
+          width: 18px;
+          height: 18px;
+          stroke: white;
+        }
+
+        .Btn-support .text {
+          position: absolute;
+          right: 0%;
+          width: 0%;
+          opacity: 0;
+          color: white;
+          font-size: 13px;
+          font-weight: 600;
+          white-space: nowrap;
+          transition: opacity 0.15s ease, width 0.18s cubic-bezier(0.16, 1, 0.3, 1), padding 0.18s ease;
+        }
+
+        .Btn-support:hover {
+          width: 140px;
+          border-radius: 40px;
+          background-color: #059669;
+        }
+
+        .Btn-support:hover .sign {
+          width: 30%;
+          padding-left: 12px;
+        }
+
+        .Btn-support:hover .text {
+          opacity: 1;
+          width: 70%;
+          padding-right: 12px;
+        }
+
+        .Btn-support:active {
+          transform: scale(0.96);
+        }
+
+
+        /* Khi mở 3 gạch: Trồi ra mượt mà 60fps chuẩn phong cách cao cấp */
+        #user-sidebar-drawer.open .user-sidebar-panel {
+          transform: translateX(0);
+          opacity: 1;
+        }
+        #user-sidebar-drawer.open .user-sidebar-panel-top {
+          transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition-delay: 0s;
+        }
+        #user-sidebar-drawer.open .user-sidebar-panel-bottom {
+          transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition-delay: 0.08s;
+        }
+
+        /* ── Menu Item: Hiệu ứng lan tỏa màu xanh từ trái sang phải từ từ chậm rãi bao phủ cả icon ── */
+        .user-sidebar-item {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 0.875rem;
+          border-radius: 12px;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #334155;
+          text-decoration: none;
+          border: 1px solid transparent;
+          margin-bottom: 3px;
+          overflow: hidden;
+          isolation: isolate;
+          transition: color 0.4s ease, border-color 0.4s ease;
+        }
+        .user-sidebar-item::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, #e0f2fe 0%, #f0f9ff 100%);
+          transform: scaleX(0);
+          transform-origin: left center;
+          transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+          z-index: -1;
+          border-radius: inherit;
+        }
+        .user-sidebar-item:hover::before {
+          transform: scaleX(1);
+        }
+        .user-sidebar-item:hover {
+          color: #0284c7;
+          border-color: #bae6fd;
+        }
+        /* Đã xóa hoàn toàn khung hình vuông quanh icon theo yêu cầu */
+        .user-sidebar-item-icon {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #64748b;
+          flex-shrink: 0;
+          background: transparent;
+          border: none;
+          transition: color 0.4s ease, transform 0.3s ease;
+        }
+        .user-sidebar-item:hover .user-sidebar-item-icon {
+          color: #0284c7;
+          transform: scale(1.1);
+        }
+        .user-sidebar-panel-top::-webkit-scrollbar { width: 4px; }
+        .user-sidebar-panel-top::-webkit-scrollbar-track { background: #f8fafc; border-radius: 999px; }
+        .user-sidebar-panel-top::-webkit-scrollbar-thumb { background: #bae6fd; border-radius: 999px; }
+      `}</style>
+      <div className="container mx-auto px-4 py-3 sm:py-4 flex justify-between items-center">
+        
+        {/* ================= LOGO & TÊN THƯƠNG HIỆU (Hover hiện chữ dưới logo kiểu About) ================= */}
+        <div className="relative group/logo flex-shrink-0 flex items-center justify-center">
+          <Link 
+            to="/" 
+            className="flex items-center justify-center p-1 sm:p-1.5 rounded-2xl hover:bg-sky-50 transition-all duration-300" 
+            title="DualeoFood Trang chủ"
+          >
+            <img 
+              src={logoImage} 
+              alt="DualeoFood Logo" 
+              className="w-8 h-8 sm:w-10 sm:h-10 object-contain transition-transform duration-300 group-hover/logo:scale-105"
+              onError={(e) => { e.target.onerror = null; e.target.src = "https://ui-avatars.com/api/?name=DF&background=0EA5E9&color=fff&rounded=true&bold=true"; }}
+            />
+          </Link>
+
+          {/* Chữ DUALEOFOOD nhỏ lại, ẩn đi và chỉ hiện ra từ từ ngay dưới logo khi di chuột (Phong cách trang About) */}
+          <div className="absolute top-[100%] left-1/2 -translate-x-1/2 pt-1 pointer-events-none z-50">
+            <div className="opacity-0 -translate-y-2 scale-90 group-hover/logo:opacity-100 group-hover/logo:translate-y-0 group-hover/logo:scale-100 transition-all duration-300 ease-out">
+              <span className="inline-block px-2.5 py-0.5 bg-white/95 backdrop-blur-md rounded-md shadow-lg border border-sky-100 text-[10px] sm:text-[11px] font-black tracking-widest text-sky-500 whitespace-nowrap">
+                DUALEOFOOD
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ================= MENU ĐIỀU HƯỚNG VỚI HIỆU ỨNG RUBBER SEGMENT (REACT BITS) ================= */}
+        <nav className="flex items-center" aria-label="Menu điều hướng chính">
+          <RubberSegment
+            items={navItems}
+            value={currentNavValue}
+            onChange={handleNavChange}
+            trackColor="transparent"
+            thumbColor="#e0f2fe"
+            textColor="#475569"
+            activeTextColor="#0284c7"
+            size="md"
+            radius={12}
+            inset={0}
+            equalSlots={false}
+            stretch={75}
+            squash={3}
+            speed={1}
+            glide={65}
+            draggable={true}
+            className="font-bold"
+            aria-label="Điều hướng các trang DualeoFood"
+          />
         </nav>
 
         {/* ================= KHU VỰC CÔNG CỤ & TÀI KHOẢN ================= */}
-        <div className="flex items-center space-x-3 sm:space-x-6">
+        <div className="flex items-center space-x-2 sm:space-x-4 xl:space-x-6">
           
-          {/* Nút Giỏ Hàng (Ẩn trên Mobile vì đã có Bottom Nav) */}
-          <Link to="/cart" id="cart-icon" className="hidden md:flex relative items-center text-slate-700 hover:text-sky-500 transition-transform duration-300 group bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
-            <span className="text-2xl mr-1 group-hover:scale-110 transition transform">🛒</span> 
-            <span className="font-bold">Giỏ hàng</span>
-            
-            {/* Vòng tròn đỏ hiển thị số lượng món ăn trong giỏ */}
-            {cartItems?.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm animate-bounce">
-                {cartItems.length}
-              </span>
-            )}
-          </Link>
+          {/* Nút Giỏ Hàng (Icon trơn không ô vuông bọc ngoài, số lượng hình tròn chuẩn 100%, cách xa nút hồ sơ) */}
+          <div className="hidden md:flex relative group/cart items-center justify-center mr-3 sm:mr-4">
+            <Link 
+              to="/cart" 
+              id="cart-icon" 
+              className="relative flex items-center justify-center p-2 text-slate-700 hover:text-sky-500 transition-colors duration-200 cursor-pointer" 
+              title="Giỏ hàng của bạn"
+            >
+              <FiShoppingCart className="w-6 h-6 sm:w-6.5 sm:h-6.5 group-hover/cart:scale-110 transition-transform duration-200 text-slate-700 group-hover/cart:text-sky-500" /> 
+              
+              {/* Vòng tròn đỏ hiển thị số lượng món ăn trong giỏ — HÌNH TRÒN CHUẨN 100% */}
+              {cartItems?.length > 0 && (
+                <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[11px] font-extrabold w-5 h-5 min-w-[20px] min-h-[20px] aspect-square flex items-center justify-center rounded-full border-2 border-white shadow-xs leading-none animate-bounce">
+                  {cartItems.length}
+                </span>
+              )}
+            </Link>
 
-          {/* ================= ICON CHUÔNG THÔNG BÁO ================= */}
+            {/* Chữ "Giỏ hàng" bình thường ẩn đi, khi di chuột vào sẽ hiện lên mượt mà ngay dưới icon */}
+            <div className="absolute top-[100%] left-1/2 -translate-x-1/2 pt-1 pointer-events-none z-50">
+              <div className="opacity-0 -translate-y-2 scale-90 group-hover/cart:opacity-100 group-hover/cart:translate-y-0 group-hover/cart:scale-100 transition-all duration-300 ease-out">
+                <span className="inline-block px-2.5 py-0.5 bg-white/95 backdrop-blur-md rounded-md shadow-lg border border-sky-100 text-[10px] sm:text-[11px] font-bold text-sky-600 whitespace-nowrap">
+                  Giỏ hàng
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ================= ICON CHUÔNG THÔNG BÁO (Phong cách y chang Giỏ Hàng) ================= */}
           {userInfo && userInfo.role !== 'admin' && (
-            <div className="relative" ref={notifRef}>
-              {/* Icon Chuông & Chấm đỏ */}
+            <div className="relative group/bell flex items-center justify-center mr-1 sm:mr-2" ref={notifRef}>
+              {/* Icon Chuông trơn không ô vuông bọc ngoài */}
               <button 
                 onClick={() => setIsNotifOpen(!isNotifOpen)} 
-                className="relative text-slate-700 hover:text-sky-500 transition"
+                className="relative flex items-center justify-center p-2 text-slate-700 hover:text-sky-500 transition-colors duration-200 cursor-pointer"
                 aria-label="Mở thông báo"
+                title="Thông báo"
               >
-                <FaBell size={24} />
+                <FiBell className="w-6 h-6 sm:w-6.5 sm:h-6.5 group-hover/bell:scale-110 transition-transform duration-200 text-slate-700 group-hover/bell:text-sky-500" />
+                
+                {/* Vòng tròn đỏ hiển thị số thông báo chưa đọc — HÌNH TRÒN CHUẨN 100% */}
                 {unreadCount > 0 && (
-                  <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
+                  <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[11px] font-extrabold w-5 h-5 min-w-[20px] min-h-[20px] aspect-square flex items-center justify-center rounded-full border-2 border-white shadow-xs leading-none animate-bounce">
                     {unreadCount}
                   </span>
                 )}
               </button>
 
+              {/* Chữ "Thông báo" bình thường ẩn đi, khi di chuột vào sẽ hiện lên mượt mà ngay dưới icon */}
+              {!isNotifOpen && (
+                <div className="absolute top-[100%] left-1/2 -translate-x-1/2 pt-1 pointer-events-none z-50">
+                  <div className="opacity-0 -translate-y-2 scale-90 group-hover/bell:opacity-100 group-hover/bell:translate-y-0 group-hover/bell:scale-100 transition-all duration-300 ease-out">
+                    <span className="inline-block px-2.5 py-0.5 bg-white/95 backdrop-blur-md rounded-md shadow-lg border border-sky-100 text-[10px] sm:text-[11px] font-bold text-sky-600 whitespace-nowrap">
+                      Thông báo
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Menu Dropdown Thông báo */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-4 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 animate-fade-in-down">
-                  <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                    <h4 className="font-bold text-gray-800 text-lg">Thông báo</h4>
+                <div className="absolute top-full mt-3 right-0 w-[calc(100vw-32px)] max-w-sm sm:w-96 bg-white rounded-2xl shadow-2xl border border-gray-100/90 z-50 animate-fade-in-down">
+                  {/* Mũi tên nhỏ trỏ vào icon chuông */}
+                  <div className="absolute -top-1.5 right-3.5 w-3 h-3 bg-white border-t border-l border-gray-100 transform rotate-45" />
+
+                  {/* Header Thông báo */}
+                  <div className="flex justify-between items-center px-4 py-3.5 border-b border-gray-100 relative z-10 bg-white rounded-t-2xl">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-gray-900 text-base">Thông báo</h4>
+                      {unreadCount > 0 && (
+                        <span className="bg-sky-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
+                          {unreadCount} mới
+                        </span>
+                      )}
+                    </div>
                     {unreadCount > 0 && (
-                      <button onClick={handleMarkAllAsRead} className="text-sm font-semibold text-sky-500 hover:underline">
+                      <button 
+                        onClick={handleMarkAllAsRead} 
+                        className="text-xs font-semibold text-sky-600 hover:text-sky-700 hover:underline cursor-pointer transition-colors"
+                      >
                         Đánh dấu tất cả đã đọc
                       </button>
                     )}
                   </div>
                   
-                  <div className="max-h-96 overflow-y-auto">
+                  {/* Danh sách thông báo */}
+                  <div className="max-h-[360px] overflow-y-auto divide-y divide-gray-50 custom-notif-scrollbar relative z-10">
                     {notifications.length === 0 ? (
-                      <p className="p-10 text-center text-gray-500">Bạn chưa có thông báo nào.</p>
+                      <div className="py-12 px-6 text-center text-gray-400">
+                        <FiBell className="w-10 h-10 mx-auto mb-2 text-gray-300 stroke-1" />
+                        <p className="text-sm font-medium">Bạn chưa có thông báo nào.</p>
+                      </div>
                     ) : (
-                      notifications.map(notif => (
-                        <div 
-                          key={notif._id} 
-                          onClick={() => handleNotifClick(notif)}
-                          className={`p-4 border-b border-gray-50 cursor-pointer transition-colors ${notif.isRead ? 'hover:bg-gray-50' : 'bg-sky-50 hover:bg-sky-100'}`}
-                        >
-                          <div className="flex justify-between items-start">
-                            <strong className="font-bold text-sm text-gray-800 mb-1 pr-2">{notif.title}</strong>
-                            {!notif.isRead && <div className="w-2.5 h-2.5 bg-sky-500 rounded-full flex-shrink-0 mt-1" title="Chưa đọc"></div>}
+                      notifications.map(notif => {
+                        const notifIcon = notif.type === 'ARTICLE_APPROVED' ? '🎉'
+                          : notif.type === 'ARTICLE_LIKE' ? '❤️'
+                          : notif.type === 'ARTICLE_COMMENT' ? '💬'
+                          : notif.type && notif.type.startsWith('ARTICLE_') ? '📝'
+                          : notif.type === 'ORDER_UPDATE' ? '📦'
+                          : notif.type === 'PROMOTION' ? '🎁'
+                          : '🔔';
+
+                        return (
+                          <div 
+                            key={notif._id} 
+                            onClick={() => handleNotifClick(notif)}
+                            className={`p-3.5 cursor-pointer transition-colors flex items-start gap-3 ${notif.isRead ? 'hover:bg-slate-50' : 'bg-sky-50/60 hover:bg-sky-100/60'}`}
+                          >
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-base shadow-2xs ${notif.isRead ? 'bg-gray-100 text-gray-600' : 'bg-sky-100 text-sky-600'}`}>
+                              {notifIcon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex justify-between items-start gap-1">
+                                <strong className="font-bold text-sm text-gray-800 leading-snug line-clamp-1">{notif.title}</strong>
+                                {!notif.isRead && (
+                                  <span className="w-2 h-2 bg-sky-500 rounded-full shrink-0 mt-1 shadow-xs" title="Chưa đọc" />
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600 my-1 leading-relaxed line-clamp-2">{notif.content}</p>
+                              <span className="text-[11px] text-gray-400 font-medium">
+                                {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: vi })}
+                              </span>
+                            </div>
                           </div>
-                          <p className="text-sm text-gray-600 mb-2">{notif.content}</p>
-                          <p className="text-xs text-gray-400 font-semibold">
-                            {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: vi })}
-                          </p>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
-                  <div className="p-2 bg-gray-50 rounded-b-xl text-center">
-                      <Link to="/my-orders" onClick={() => setIsNotifOpen(false)} className="text-sm font-bold text-sky-600 hover:underline">Xem tất cả đơn hàng</Link>
+
+                  {/* Footer Xem tất cả */}
+                  <div className="p-3 bg-slate-50/90 rounded-b-2xl text-center border-t border-gray-100 relative z-10">
+                    <Link 
+                      to="/notifications" 
+                      onClick={() => setIsNotifOpen(false)} 
+                      className="text-xs sm:text-sm font-bold text-sky-600 hover:text-sky-700 hover:underline inline-flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <span>Xem tất cả thông báo</span>
+                      <span aria-hidden="true">&rarr;</span>
+                    </Link>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ================= KHU VỰC TÀI KHOẢN (Auth) ================= */}
-          <div className="border-l-2 pl-3 sm:pl-6 border-sky-50 flex items-center">
+          {/* ================= KHU VỰC TÀI KHOẢN (Auth — Không ô vuông bọc ngoài) ================= */}
+          <div className="border-l border-slate-200 sm:border-l sm:border-slate-200 pl-3 sm:pl-4 xl:pl-6 flex items-center">
             {userInfo ? (
-              // Trạng thái 1: ĐÃ ĐĂNG NHẬP
-              <div className="relative" ref={userMenuRef}>
+              // Trạng thái 1: ĐÃ ĐĂNG NHẬP — nút trigger mở sidebar drawer (BỎ Ô VUÔNG BỌC NGOÀI)
+              <div className="relative">
                 <button 
-                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                  className="flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 transition"
+                  type="button"
+                  id="user-account-btn"
+                  onClick={() => {
+                    if (isUserMenuOpen) {
+                      closeUserSidebar();
+                    } else {
+                      openUserSidebar();
+                    }
+                  }}
+                  className="group flex items-center gap-2 p-1 transition-all duration-200 cursor-pointer bg-transparent border-none shadow-none text-slate-800 hover:text-sky-600"
+                  aria-expanded={isUserMenuOpen}
+                  aria-label="Mở thanh Sidebar tài khoản"
                 >
                   {userInfo?.avatar ? (
-                    <img src={`${getImageUrl(userInfo.avatar)}`} alt={userInfo.name} className="w-8 h-8 rounded-full object-cover border border-sky-200" />
+                    <img 
+                      src={`${getImageUrl(userInfo.avatar)}`} 
+                      alt={userInfo.name} 
+                      className="w-8 h-8 rounded-full object-cover shrink-0 shadow-xs group-hover:ring-2 group-hover:ring-sky-400 transition-all duration-200" 
+                    />
                   ) : (
-                    <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold border border-sky-200">
+                    <div className="w-8 h-8 bg-gradient-to-br from-sky-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs group-hover:ring-2 group-hover:ring-sky-400 transition-all duration-200">
                       {userInfo?.name?.charAt(0)?.toUpperCase() || 'U'}
                     </div>
                   )}
-                  <span className="font-semibold text-gray-600 hidden md:inline">
-                    <span className="text-sky-600 font-bold">{userInfo?.name}</span>
+                  <span className="font-bold text-xs sm:text-sm text-slate-800 group-hover:text-sky-600 transition-colors hidden xl:inline whitespace-nowrap">
+                    {userInfo?.name}
                   </span>
-                   <svg className={`w-4 h-4 text-gray-500 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  <span className="p-1 text-slate-400 group-hover:text-sky-500 transition-colors inline-flex items-center justify-center shrink-0">
+                    <svg 
+                      className={`w-4 h-4 sm:w-4.5 sm:h-4.5 transition-transform duration-300 ${isUserMenuOpen ? 'rotate-90 text-sky-600' : ''}`} 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M4 6h16M4 12h16M4 18h16" />
+                    </svg>
+                  </span>
                 </button>
-
-                {/* Dropdown Menu cho User */}
-                {isUserMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-2xl border border-gray-50 z-50 animate-fade-in-down py-2">
-                    {userInfo?.role === 'admin' && (
-                      <Link 
-                        to="/admin" 
-                        onClick={() => setIsUserMenuOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-orange-500 hover:bg-orange-50"
-                      >
-                        ⚙️ Quản trị
-                      </Link>
-                    )}
-                    <Link 
-                      to="/profile" 
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      👤 Hồ sơ cá nhân
-                    </Link>
-                    <Link 
-                      to="/my-addresses" 
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      📍 Địa chỉ của tôi
-                    </Link>
-                    <Link 
-                      to="/my-orders" 
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      📦 Đơn hàng của tôi
-                    </Link>
-                    <Link 
-                      to="/wallet" 
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      🎟️ Kho Voucher
-                    </Link>
-                    <Link 
-                      to="/my-reviews" 
-                      onClick={() => setIsUserMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      📝 Đánh giá của tôi
-                    </Link>
-                    <div className="border-t my-2"></div>
-                    <button 
-                      onClick={() => {
-                        setIsUserMenuOpen(false);
-                        handleLogout();
-                      }} 
-                      className="w-full text-left flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-red-500 hover:bg-red-50"
-                    >
-                      Đăng xuất
-                    </button>
-                  </div>
-                )}
               </div>
             ) : (
               // Trạng thái 2: CHƯA ĐĂNG NHẬP
               <button
+                type="button"
                 onClick={() => dispatch(openAuthModal())}
-                className="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2.5 px-6 rounded-xl shadow-sm transition duration-300 hover:scale-105 flex items-center gap-2"
+                className="bg-sky-500 hover:bg-sky-600 active:scale-95 text-white font-bold py-1.5 px-3 sm:py-2.5 sm:px-5 rounded-xl shadow-sm transition duration-200 hover:scale-105 flex items-center gap-1.5 text-xs sm:text-sm whitespace-nowrap"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
                 </svg>
-                Đăng nhập
+                <span>Đăng nhập</span>
               </button>
             )}
           </div>
 
-          {/* Nút Hamburger (Chỉ hiện trên màn hình nhỏ) */}
-          <button 
-            className="lg:hidden text-slate-700 hover:text-sky-500"
-            onClick={() => setIsMobileMenuOpen(true)}
-            aria-label="Mở menu"
-          >
-            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
-          </button>
-
         </div>
       </div>
+    </header>
 
-      {/* ================= MOBILE MENU (Sidebar) ================= */}
-      {/* Lớp phủ nền */}
-      <div 
-        className={`fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300 lg:hidden ${isMobileMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-        onClick={() => setIsMobileMenuOpen(false)}
-      ></div>
+      {/* ═══════════════════════════════════════════════════════════════════════
+          USER SIDEBAR DRAWER
+          Pattern: GSAP Timeline .clear() & rebuild (demo-ui)
+          • Enter: fromTo() — bắt đầu từ trạng thái đã biết (panels từ phải vào)
+          • Exit:  to()     — pick up từ trạng thái hiện tại, panels rơi ngẫu nhiên
+          • Bo tròn mượt mà: border-radius 16px (như demo-ui nav-border 10px)
+          Cấu trúc 3 panels: Top (trắng) / Middle (xanh gradient) / Bottom (tối)
+      ════════════════════════════════════════════════════════════════════════ */}
+      {userInfo && (
+        <div 
+          id="user-sidebar-drawer" 
+          className={isUserMenuOpen ? 'open' : ''}
+          aria-hidden={!isUserMenuOpen}
+        >
+          {/* Backdrop */}
+          <div
+            className="user-sidebar-bg"
+            onClick={closeUserSidebar}
+            aria-hidden="true"
+          />
 
-      {/* Bảng menu */}
-      <div className={`fixed top-0 right-0 h-full w-4/5 max-w-sm bg-white z-50 transform transition-transform duration-300 ease-in-out lg:hidden overflow-y-auto ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="flex justify-between items-center p-5 border-b border-slate-100">
-          <h2 className="font-black text-xl text-sky-500">MENU</h2>
-          <button onClick={() => setIsMobileMenuOpen(false)} aria-label="Đóng menu">
-            <svg className="w-7 h-7 text-slate-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-        
-        {/* Khu vực tài khoản trên mobile */}
-        <div className="p-5 border-b border-slate-100">
-          {userInfo ? (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
+          {/* ── PANEL 1: THÔNG TIN HỒ SƠ & DANH SÁCH ĐIỀU HƯỚNG (Top — Trắng) ── */}
+          <div
+            className="user-sidebar-panel user-sidebar-panel-top"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header: Avatar + Tên + Nút đóng */}
+            <div className="flex items-start justify-between gap-3 pb-4 mb-3 border-b-2 border-slate-100">
+              <div className="flex items-center gap-3 min-w-0">
                 {userInfo?.avatar ? (
-                  <img src={`${getImageUrl(userInfo.avatar)}`} alt={userInfo.name} className="w-12 h-12 rounded-full object-cover border-2 border-sky-200" />
+                  <img
+                    src={`${getImageUrl(userInfo.avatar)}`}
+                    alt={userInfo.name}
+                    className="w-12 h-12 rounded-xl object-cover shrink-0 shadow-sm"
+                  />
                 ) : (
-                  <div className="w-12 h-12 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold border-2 border-sky-200 text-xl">
-                    {userInfo.name.charAt(0).toUpperCase()}
+                  <div className="w-12 h-12 bg-gradient-to-br from-sky-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold text-base shrink-0 shadow-sm">
+                    {userInfo?.name?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
                 )}
-                <div>
-                  <p className="font-bold text-gray-800">{userInfo.name}</p>
-                  <p className="text-sm text-gray-500">Chào mừng trở lại!</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-black text-slate-800 text-sm sm:text-base truncate">
+                      {userInfo?.name}
+                    </h3>
+                    {userInfo?.role === 'admin' && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold border border-amber-200 shrink-0">
+                        ADMIN
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                    {userInfo?.email || userInfo?.phone || 'Thành viên DualeoFood'}
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-sky-700 mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Hội viên DualeoFood
+                  </span>
                 </div>
               </div>
-              <div className="flex flex-col space-y-1">
-                {userInfo.role === 'admin' && <button onClick={() => handleMobileNav('/admin')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-orange-50 hover:text-orange-500 transition">⚙️ Quản trị</button>}
-                <button onClick={() => handleMobileNav('/profile')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">👤 Hồ sơ cá nhân</button>
-                <button onClick={() => handleMobileNav('/my-addresses')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📍 Địa chỉ của tôi</button>
-                <button onClick={() => handleMobileNav('/my-orders')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📦 Đơn hàng của tôi</button>
-                <button onClick={() => handleMobileNav('/wallet')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">🎟️ Kho Voucher</button>
-                <button onClick={() => handleMobileNav('/my-reviews')} className="w-full text-left font-semibold text-gray-700 p-3 rounded-xl hover:bg-sky-50 hover:text-sky-500 transition">📝 Đánh giá của tôi</button>
-                <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="w-full text-left font-semibold text-red-500 p-3 rounded-xl hover:bg-red-50 transition">Đăng xuất</button>
-              </div>
-            </div>
-          ) : (
-            <button onClick={() => { setIsMobileMenuOpen(false); dispatch(openAuthModal()); }} className="w-full block bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition duration-300 text-center">
-              Đăng nhập / Đăng ký
-            </button>
-          )}
-        </div>
 
-        {/* Khu vực điều hướng chính trên mobile */}
-        <nav className="flex flex-col p-5 space-y-2">
-          {navLinks.map((link) => (
+              {/* Nút đóng sidebar (chữ X đóng bình thường) */}
+              <button
+                type="button"
+                id="sidebar-close-btn"
+                onClick={closeUserSidebar}
+                className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition-colors flex items-center justify-center cursor-pointer shrink-0 shadow-xs relative z-20"
+                aria-label="Đóng sidebar"
+              >
+                <svg className="w-5 h-5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Danh sách điều hướng */}
+            <div className="flex flex-col flex-1">
+              {[
+                ...(userInfo?.role === 'admin' ? [{
+                  to: '/admin',
+                  label: 'Bảng Quản Trị Hệ Thống',
+                  badge: 'Admin',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  )
+                }] : []),
+                {
+                  to: '/profile',
+                  label: 'Hồ Sơ Cá Nhân',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  )
+                },
+                {
+                  to: '/notifications',
+                  label: 'Thông Báo Của Tôi',
+                  badge: unreadCount > 0 ? `${unreadCount} mới` : null,
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                  )
+                },
+                {
+                  to: '/wallet',
+                  label: 'Kho Voucher Của Tôi',
+                  badge: voucherCount > 0 ? `${voucherCount} mã` : null,
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                    </svg>
+                  )
+                },
+                {
+                  to: '/my-addresses',
+                  label: 'Sổ Địa Chỉ Nhận Hàng',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  )
+                },
+                {
+                  to: '/my-orders',
+                  label: 'Lịch Sử Đơn Hàng',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  )
+                },
+                {
+                  to: '/my-reviews',
+                  label: 'Đánh Giá & Cảm Nhận',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  )
+                }
+              ].map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => closeUserSidebar()}
+                  className="user-sidebar-item"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="user-sidebar-item-icon">
+                      {item.icon}
+                    </span>
+                    <span className="truncate">{item.label}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {item.badge && (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700 border border-sky-200">
+                        {item.badge}
+                      </span>
+                    )}
+                    <svg
+                      className="w-4 h-4 text-slate-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* ── PANEL 2: ĐĂNG XUẤT TÀI KHOẢN & HỖ TRỢ 24/7 (Bottom — Nền xanh thương hiệu) ── */}
+          <div
+            className="user-sidebar-panel user-sidebar-panel-bottom"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Nút Đăng xuất bên trái */}
             <button
-              key={link.path}
-              onClick={() => handleMobileNav(link.path)}
-              className={`w-full text-left font-bold text-lg p-4 rounded-xl transition-colors duration-200 ${
-                location.pathname === link.path ? 'bg-sky-100 text-sky-600' : 'text-gray-700 hover:bg-sky-50 hover:text-sky-500'
-              }`}
+              type="button"
+              onClick={() => {
+                closeUserSidebar();
+                handleLogout();
+              }}
+              className="Btn-logout"
+              title="Đăng xuất"
+              aria-label="Đăng xuất"
             >
-              {link.text}
+              <div className="sign">
+                <svg viewBox="0 0 512 512">
+                  <path d="M377.9 105.9L500.7 228.7c7.2 7.2 11.3 17.1 11.3 27.3s-4.1 20.1-11.3 27.3L377.9 406.1c-6.4 6.4-15 9.9-24 9.9c-18.7 0-33.9-15.2-33.9-33.9l0-62.1-128 0c-17.7 0-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32l128 0 0-62.1c0-18.7 15.2-33.9 33.9-33.9c9 0 17.6 3.6 24 9.9zM160 96L96 96c-17.7 0-32 14.3-32 32l0 256c0 17.7 14.3 32 32 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-64 0c-53 0-96-43-96-96L0 128C0 75 43 32 96 32l64 0c17.7 0 32 14.3 32 32s-14.3 32-32 32z" />
+                </svg>
+              </div>
+              <div className="text">Đăng xuất</div>
             </button>
-          ))}
-        </nav>
-      </div>
-      
+
+            {/* Dấu gạch đứng phân cách ở giữa */}
+            <div className="w-[1.5px] h-5 bg-white/30 rounded-full mx-2 shrink-0" aria-hidden="true" />
+
+            {/* Nút Hỗ trợ 24/7 bên phải (Hiệu ứng bung chữ đồng bộ) */}
+            <Link
+              to="/contact"
+              onClick={closeUserSidebar}
+              className="Btn-support"
+              title="Tổng đài chăm sóc & hỗ trợ khách hàng 24/7"
+              aria-label="Hỗ trợ 24/7"
+            >
+              <div className="sign">
+                <FiHeadphones className="w-[18px] h-[18px] text-white" />
+              </div>
+              <div className="text">Hỗ trợ 24/7</div>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* ================= BOTTOM NAVIGATION BAR (Mobile Only) ================= */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 flex justify-around items-center h-16 z-50">
-        <Link to="/" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}>
-          <FiHome size={22} />
-          <span className="text-[10px] font-bold">Trang chủ</span>
+      {/* Đặt ngoài thẻ <header> để không bị backdrop-blur / transform hạn chế, cố định 100% ở đáy màn hình điện thoại */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white/95 backdrop-blur-lg border-t border-slate-200/90 flex justify-around items-center h-16 z-[999] shadow-[0_-4px_25px_rgba(0,0,0,0.08)] pb-safe">
+        <Link to="/" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 ${location.pathname === '/' ? 'text-sky-500 font-bold' : 'text-slate-500 hover:text-sky-500 font-medium'}`}>
+          <FiHome size={21} />
+          <span className="text-[10px]">Trang chủ</span>
         </Link>
-        <Link to="/menu" className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/menu' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}>
-          <FiList size={22} />
-          <span className="text-[10px] font-bold">Thực đơn</span>
+        <Link to="/menu" className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 ${location.pathname === '/menu' ? 'text-sky-500 font-bold' : 'text-slate-500 hover:text-sky-500 font-medium'}`}>
+          <FiList size={21} />
+          <span className="text-[10px]">Thực đơn</span>
         </Link>
-        <Link to="/cart" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/cart' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}>
+        <Link to="/cart" className={`relative flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 ${location.pathname === '/cart' ? 'text-sky-500 font-bold' : 'text-slate-500 hover:text-sky-500 font-medium'}`}>
           <div className="relative">
-            <FiShoppingBag size={22} />
+            <FiShoppingBag size={21} />
             {cartItems?.length > 0 && (
               <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
                 {cartItems.length}
               </span>
             )}
           </div>
-          <span className="text-[10px] font-bold">Giỏ hàng</span>
+          <span className="text-[10px]">Giỏ hàng</span>
         </Link>
         <button 
           onClick={() => {
@@ -492,14 +1120,13 @@ const Header = () => {
               dispatch(openAuthModal());
             }
           }} 
-          className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${location.pathname === '/profile' ? 'text-sky-500' : 'text-gray-500 hover:text-sky-500'}`}
+          className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 ${location.pathname === '/profile' ? 'text-sky-500 font-bold' : 'text-slate-500 hover:text-sky-500 font-medium'}`}
         >
-          <FiUser size={22} />
-          <span className="text-[10px] font-bold">Tài khoản</span>
+          <FiUser size={21} />
+          <span className="text-[10px]">Tài khoản</span>
         </button>
       </nav>
-
-    </header>
+    </>
   );
 };
 

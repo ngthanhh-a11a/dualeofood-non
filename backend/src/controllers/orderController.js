@@ -5,6 +5,7 @@ const UserVoucher = require('../models/UserVoucher');
 const ActivityLog = require('../models/ActivityLog'); // Import model nhật ký hoạt động
 const mongoose = require('mongoose');
 const Coupon = require('../models/Coupon');
+const { emitAdminPendingCounts } = require('../utils/adminRealtime');
 
 // [POST] Tạo đơn hàng mới (Dành cho Customer đã đăng nhập)
 exports.createOrder = async (req, res) => {
@@ -143,6 +144,7 @@ exports.createOrder = async (req, res) => {
             req.io.to('admin_room').emit('new_order', detailedOrder);
             const pendingCount = await Order.countDocuments({ status: 'PENDING' });
             req.io.to('admin_room').emit('update_pending_orders_count', pendingCount);
+            emitAdminPendingCounts(req.io);
             // Thông báo cho dashboard cập nhật real-time
             req.io.to('admin_room').emit('dashboard_updated');
         }
@@ -208,33 +210,97 @@ exports.getOrdersByUserId = async (req, res) => {
 exports.getMyOrders = async (req, res) => {
     try {
         let page = parseInt(req.query.page) || 1;
-        const limit = 5; // Hiển thị 5 đơn hàng mỗi trang
-        const { findOrderId } = req.query;
+        const limit = parseInt(req.query.limit) || 6;
+        const { findOrderId, status, search, sort } = req.query;
 
+        const baseUserQuery = { user: req.user.id };
         const filterQuery = { user: req.user.id };
+
+        // Lọc theo trạng thái nếu có
+        if (status && status !== 'ALL') {
+            filterQuery.status = status;
+        }
+
+        // Lọc theo từ khóa tìm kiếm (mã đơn) nếu có
+        if (search && search.trim()) {
+            const cleanSearch = search.trim();
+            if (mongoose.Types.ObjectId.isValid(cleanSearch)) {
+                filterQuery._id = cleanSearch;
+            } else {
+                // Cho phép tìm kiếm theo đuôi mã đơn hàng hoặc ký tự trong ID
+                filterQuery.$expr = {
+                    $regexMatch: {
+                        input: { $toString: '$_id' },
+                        regex: cleanSearch,
+                        options: 'i'
+                    }
+                };
+            }
+        }
+
+        // Thống kê tổng quan đơn hàng cho user
+        const allUserOrders = await Order.find(baseUserQuery).select('status finalAmount createdAt').lean();
+        const totalUserOrders = allUserOrders.length;
+
+        const stats = {
+            totalOrders: totalUserOrders,
+            pendingCount: 0,
+            processingCount: 0,
+            deliveringCount: 0,
+            completedCount: 0,
+            cancelledCount: 0,
+            activeCount: 0,
+            totalSpent: 0,
+            statusCounts: {
+                ALL: totalUserOrders,
+                PENDING: 0,
+                PROCESSING: 0,
+                DELIVERING: 0,
+                COMPLETED: 0,
+                CANCELLED: 0
+            }
+        };
+
+        allUserOrders.forEach(o => {
+            if (stats.statusCounts[o.status] !== undefined) {
+                stats.statusCounts[o.status] += 1;
+            }
+            if (o.status === 'PENDING') stats.pendingCount++;
+            if (o.status === 'PROCESSING') stats.processingCount++;
+            if (o.status === 'DELIVERING') stats.deliveringCount++;
+            if (o.status === 'COMPLETED') {
+                stats.completedCount++;
+                stats.totalSpent += (o.finalAmount || 0);
+            }
+            if (o.status === 'CANCELLED') stats.cancelledCount++;
+            if (['PENDING', 'PROCESSING', 'DELIVERING'].includes(o.status)) {
+                stats.activeCount++;
+            }
+        });
 
         // Nếu có yêu cầu tìm trang của một đơn hàng cụ thể
         if (findOrderId && mongoose.Types.ObjectId.isValid(findOrderId)) {
-            // Lấy danh sách ID tất cả đơn hàng của user, sắp xếp theo thứ tự hiển thị
-            const allUserOrderIds = await Order.find(filterQuery).sort({ createdAt: -1 }).select('_id').lean();
-            // Tìm vị trí (index) của đơn hàng cần tìm trong danh sách
-            const orderIndex = allUserOrderIds.findIndex(order => order._id.toString() === findOrderId);
-
-            // Nếu tìm thấy, tính toán lại trang cần hiển thị
+            const allFilteredOrderIds = await Order.find(filterQuery).sort({ createdAt: -1 }).select('_id').lean();
+            const orderIndex = allFilteredOrderIds.findIndex(order => order._id.toString() === findOrderId);
             if (orderIndex !== -1) {
                 page = Math.floor(orderIndex / limit) + 1;
             }
         }
 
         const skip = (page - 1) * limit;
-
         const totalOrders = await Order.countDocuments(filterQuery);
 
+        // Xử lý sắp xếp
+        let sortOption = { createdAt: -1 };
+        if (sort === 'oldest') sortOption = { createdAt: 1 };
+        if (sort === 'highest') sortOption = { finalAmount: -1 };
+        if (sort === 'lowest') sortOption = { finalAmount: 1 };
+
         const orders = await Order.find(filterQuery)
-            .sort({ createdAt: -1 })
+            .sort(sortOption)
             .skip(skip)
             .limit(limit)
-            .populate('items.product', 'name image'); // Lấy thêm tên và ảnh của món ăn
+            .populate('items.product', 'name image price');
 
         // Lấy danh sách ID các sản phẩm mà người dùng này đã đánh giá
         const reviewedProducts = await Product.find({ 'reviews.user': req.user.id }, '_id');
@@ -243,12 +309,14 @@ exports.getMyOrders = async (req, res) => {
         res.status(200).json({
             orders,
             totalOrders,
-            currentPage: page, // Trả về trang đã được tính toán
-            totalPages: Math.ceil(totalOrders / limit),
-            reviewedProductIds // Gửi danh sách này về cho Frontend
+            currentPage: page,
+            totalPages: Math.ceil(totalOrders / limit) || 1,
+            reviewedProductIds,
+            stats
         });
     } catch (error) {
-        throw error;
+        console.error('Lỗi khi lấy đơn hàng của user:', error);
+        res.status(500).json({ message: 'Lỗi server khi tải dữ liệu đơn hàng.', error: error.message });
     }
 };
 
@@ -329,6 +397,7 @@ exports.updateOrderStatus = async (req, res) => {
         // Sau khi cập nhật, gửi lại số lượng đơn hàng đang chờ cho admin
         const pendingCount = await Order.countDocuments({ status: 'PENDING' });
         req.io.to('admin_room').emit('update_pending_orders_count', pendingCount);
+        emitAdminPendingCounts(req.io);
 
         // Gửi thông báo cập nhật trạng thái đến khách hàng sở hữu đơn hàng này
         req.io.to(updatedOrder.user.toString()).emit('order_status_updated', updatedOrder);

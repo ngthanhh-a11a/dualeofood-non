@@ -17,6 +17,7 @@ import MyOrders from './pages/user/MyOrders';
 import Profile from './pages/user/Profile';
 import MyReviews from './pages/user/MyReviews';
 import MyAddresses from './pages/user/MyAddresses';
+import Notifications from './pages/user/Notifications';
 import PrivateRoute from './layouts/PrivateRoute';
 import RoleBasedRoute from './layouts/RoleBasedRoute'; // Import component phân quyền route
 import Promotions from './pages/public/Promotions';
@@ -57,7 +58,7 @@ import StaffLiveChat from './pages/staff/StaffLiveChat';
 const PublicLayout = () => (
   <>
     <Header />
-    <main className="pt-24">
+    <main className="pb-16 md:pb-0">
       <Outlet />
     </main>
     <Footer />
@@ -114,6 +115,7 @@ function App() {
           <Route path="profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="my-addresses" element={<PrivateRoute><MyAddresses /></PrivateRoute>} />
           <Route path="wallet" element={<PrivateRoute><Wallet /></PrivateRoute>} />
+          <Route path="notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
         </Route>
 
         {/* ================= ROUTES ĐỘC LẬP (Không dùng layout chung) ================= */}

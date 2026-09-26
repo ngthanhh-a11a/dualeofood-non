@@ -16,6 +16,12 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dualeofood_secret');
     req.user = decoded; // Gán thông tin giải mã (id, role) vào req
+    if (decoded.id && !req.user._id) {
+      req.user._id = decoded.id;
+    }
+    if (decoded._id && !req.user.id) {
+      req.user.id = decoded._id;
+    }
     next();
   } catch (error) {
     res.status(401).json({ message: 'Token không hợp lệ' });

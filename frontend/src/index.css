@@ -1,3 +1,59 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom sleek scrollbar for voucher list & containers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  transition: background-color 0.2s;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #0ea5e9;
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 8s linear infinite;
+}
+
+@keyframes holographicShimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.hologram-shimmer {
+  background: linear-gradient(135deg, #ffd700, #ff69b4, #00ffff, #ffd700);
+  background-size: 300% 300%;
+  animation: holographicShimmer 4s ease infinite;
+}
+
+/* Hide scrollbar for clean horizontal icon navigation */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Handwriting & Signature typography */
+.font-handwriting {
+  font-family: 'Dancing Script', 'Caveat', cursive, sans-serif;
+}
+.font-signature {
+  font-family: 'Caveat', 'Dancing Script', cursive, sans-serif;
+}

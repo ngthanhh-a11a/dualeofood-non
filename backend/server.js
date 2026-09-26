@@ -26,6 +26,7 @@ const activityLogRoutes = require('./src/routes/activityLogRoutes'); // Route nh
 const chatRoutes = require('./src/routes/chatRoutes'); // Route cho Live Chat
 const bannerRoutes = require('./src/routes/bannerRoutes'); // Route cho Banners
 const articleRoutes = require('./src/routes/articleRoutes'); // Route cho Blog/Bài viết
+const storyRoutes = require('./src/routes/storyRoutes'); // Route cho Story 24h
 
 // Import Models cho cron job và socket
 const Order = require('./src/models/Order');
@@ -77,8 +78,15 @@ io.use((socket, next) => {
 // Danh sách lưu trữ bộ đếm thời gian cho mỗi cuộc hội thoại
 const chatTimeouts = new Map();
 
+const { emitAdminPendingCounts } = require('./src/utils/adminRealtime');
+
 // Xử lý sự kiện Socket.io
 io.on('connection', (socket) => {
+    // Nếu là admin hoặc staff kết nối, gửi ngay số liệu công việc cần duyệt
+    if (socket.user && (socket.user.role === 'admin' || socket.user.role === 'staff')) {
+        emitAdminPendingCounts(io);
+    }
+
     // 1. Khách hàng join phòng chat của riêng họ
     socket.on('join_chat', ({ guestId, userId }) => {
         const room = userId ? `chat_user_${userId}` : `chat_guest_${guestId}`;
@@ -166,6 +174,7 @@ io.on('connection', (socket) => {
                 customerName: conversation.customerName,
                 message: savedMessage
             });
+            emitAdminPendingCounts(io);
 
             // --- TÍCH HỢP AI CHATBOT (10 GIÂY) ---
             // Xóa bộ đếm cũ nếu có
@@ -240,6 +249,7 @@ io.on('connection', (socket) => {
 
                 // Báo lại cho toàn bộ admin/staff (để đồng bộ nhiều màn hình admin)
                 io.to('admin_room').emit('receive_message', { conversationId, message: savedMessage });
+                emitAdminPendingCounts(io);
 
                 // Gửi tin nhắn đến khách hàng
                 const room = conversation.userId ? `chat_user_${conversation.userId}` : `chat_guest_${conversation.guestId}`;
@@ -279,6 +289,7 @@ app.use('/api/activity-logs', activityLogRoutes); // Đăng ký route nhật ký
 app.use('/api/chats', chatRoutes); // Route cho Live Chat
 app.use('/api/banners', bannerRoutes);
 app.use('/api/articles', articleRoutes);
+app.use('/api/stories', storyRoutes);
 
 // --- Không còn phục vụ ảnh tĩnh cục bộ vì đã dùng Cloudinary ---
 

@@ -18,12 +18,23 @@ const notificationSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['ORDER_UPDATE', 'PROMOTION', 'SYSTEM'], // Chỉ cho phép 3 loại thông báo này
+      enum: ['ORDER_UPDATE', 'PROMOTION', 'SYSTEM', 'ARTICLE_UPDATE', 'ARTICLE_APPROVED', 'ARTICLE_COMMENT', 'ARTICLE_LIKE', 'STORY_UPDATE', 'STORY_APPROVED', 'STORY_REJECTED'],
       default: 'SYSTEM'
     },
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Order' // Tham chiếu đến đơn hàng liên quan (nếu có)
+    },
+    articleId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Article' // Tham chiếu đến bài viết liên quan (nếu có)
+    },
+    storyId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Story' // Tham chiếu đến Story liên quan (nếu có)
+    },
+    link: {
+      type: String // Đường dẫn chuyển hướng khi click vào thông báo
     },
     isRead: { 
       type: Boolean, 

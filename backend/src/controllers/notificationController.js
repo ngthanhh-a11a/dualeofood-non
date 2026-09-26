@@ -4,10 +4,11 @@ const User = require('../models/User'); // Cần import User để lấy danh s�
 
 // 1. Lấy danh sách thông báo của User đang đăng nhập
 const getNotifications = asyncHandler(async (req, res) => {
-  // Tìm thông báo theo ID của user, sắp xếp mới nhất lên đầu, lấy tối đa 20 cái
+  const limit = parseInt(req.query.limit) || 100;
+  // Tìm thông báo theo ID của user, sắp xếp mới nhất lên đầu
   const notifications = await Notification.find({ user: req.user.id })
     .sort({ createdAt: -1 })
-    .limit(20);
+    .limit(limit);
 
   res.status(200).json(notifications);
 });
@@ -35,6 +36,30 @@ const markAllAsRead = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Đã dọn sạch chấm đỏ!' });
 });
 
+// 4. Xóa một thông báo theo ID
+const deleteNotification = asyncHandler(async (req, res) => {
+  const notification = await Notification.findById(req.params.id);
+
+  if (!notification) {
+    return res.status(404).json({ message: 'Không tìm thấy thông báo' });
+  }
+
+  if (notification.user.toString() !== req.user.id) {
+    return res.status(403).json({ message: 'Không có quyền xóa thông báo này' });
+  }
+
+  await notification.deleteOne();
+  res.status(200).json({ message: 'Đã xóa thông báo thành công' });
+});
+
+// 5. Dọn dẹp tất cả thông báo đã đọc
+const clearReadNotifications = asyncHandler(async (req, res) => {
+  await Notification.deleteMany({
+    user: req.user.id,
+    isRead: true
+  });
+  res.status(200).json({ message: 'Đã dọn dẹp các thông báo đã đọc' });
+});
 
 // [POST] Gửi thông báo hàng loạt (Chỉ Admin)
 const broadcastNotification = asyncHandler(async (req, res) => {
@@ -76,4 +101,11 @@ const broadcastNotification = asyncHandler(async (req, res) => {
   res.status(200).json({ message: `Gửi thông báo thành công tới ${targetUserIds.length} khách hàng!` });
 });
 
-module.exports = { getNotifications, markAsRead, markAllAsRead, broadcastNotification };
+module.exports = { 
+  getNotifications, 
+  markAsRead, 
+  markAllAsRead, 
+  deleteNotification, 
+  clearReadNotifications, 
+  broadcastNotification 
+};

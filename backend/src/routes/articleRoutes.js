@@ -32,9 +32,10 @@ const adminOnly = authorizeRoles('admin');
 
 router.route('/')
     .get(optionalAuth, articleController.getArticles)
-    .post(verifyToken, adminOrStaff, upload.single('thumbnail'), articleController.createArticle);
+    .post(verifyToken, upload.single('thumbnail'), articleController.createArticle);
 
 router.get('/comments/all', verifyToken, adminOrStaff, articleController.getAllArticleComments);
+router.get('/my-articles', verifyToken, articleController.getMyArticles);
 
 router.route('/:slug').get(articleController.getArticleBySlug);
 router.route('/id/:id').get(verifyToken, adminOrStaff, articleController.getArticleById);
@@ -47,6 +48,6 @@ router.route('/:id/unclap').post(verifyToken, articleController.removeClap);
 
 router.route('/:id')
     .put(verifyToken, adminOnly, upload.single('thumbnail'), articleController.updateArticle)
-    .delete(verifyToken, adminOnly, articleController.deleteArticle);
+    .delete(verifyToken, articleController.deleteArticle);
 
 module.exports = router;

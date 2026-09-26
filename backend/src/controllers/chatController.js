@@ -101,6 +101,11 @@ exports.markConversationAsRead = async (req, res) => {
         conversation.hasUnreadAdmin = false;
         await conversation.save();
 
+        if (req.io) {
+            const { emitAdminPendingCounts } = require('../utils/adminRealtime');
+            emitAdminPendingCounts(req.io);
+        }
+
         res.status(200).json({ success: true });
     } catch (error) {
         throw error;

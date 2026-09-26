@@ -6,13 +6,17 @@ const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('../config/cloudinary');
 
-// Cấu hình Multer để đẩy file trực tiếp lên đám mây Cloudinary
+// Cấu hình Multer để đẩy file (ảnh hoặc video) trực tiếp lên Cloudinary
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
-    params: {
-        folder: 'dualeofood_banners',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'webp'],
-        public_id: (req, file) => `banner-${Date.now()}`
+    params: async (req, file) => {
+        const isVideo = file.mimetype && file.mimetype.startsWith('video');
+        return {
+            folder: 'dualeofood_banners',
+            resource_type: isVideo ? 'video' : 'image',
+            allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'mp4', 'webm', 'mov'],
+            public_id: `banner-${Date.now()}`
+        };
     }
 });
 const upload = multer({ storage });
@@ -35,7 +39,7 @@ router.route('/')
     .post(verifyToken, adminOrStaff, upload.single('image'), bannerController.createBanner);
 
 router.route('/:id')
-    .put(verifyToken, adminOnly, upload.single('image'), bannerController.updateBanner)
+    .put(verifyToken, adminOrStaff, upload.single('image'), bannerController.updateBanner)
     .delete(verifyToken, adminOnly, bannerController.deleteBanner);
 
 module.exports = router;

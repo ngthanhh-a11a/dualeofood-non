@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { addToCart } from '../../redux/cartSlice';
-import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
-import { Link, useNavigate } from 'react-router-dom'; // 1. Import useNavigate
-import { FiStar, FiEdit } from 'react-icons/fi';
+import axios, { SERVER_URL, getImageUrl, getOptimizedVideoUrl, getVideoPosterUrl, getOptimizedImageUrl } from '../../utils/axiosConfig';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiStar, FiEdit, FiPlay, FiPause, FiVolume2, FiVolumeX } from 'react-icons/fi';
 import ReviewModal from '../../components/features/ReviewModal';
 import toast from 'react-hot-toast';
 import StarRating from '../../components/common/StarRating'; // Import component
@@ -29,6 +29,80 @@ const Home = () => {
   const [banners, setBanners] = useState([]);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
+  // Quản lý trạng thái phát & âm thanh cho Video Banner
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const videoRefs = useRef({});
+
+  // Kiểm tra banner đang hiển thị có phải là video không
+  const currentBanner = banners[currentBannerIndex];
+  const isCurrentVideo = Boolean(
+    currentBanner && (
+      currentBanner.mediaType === 'video' ||
+      (typeof currentBanner.image === 'string' && (
+        currentBanner.image.toLowerCase().endsWith('.mp4') ||
+        currentBanner.image.toLowerCase().endsWith('.webm') ||
+        currentBanner.image.toLowerCase().endsWith('.mov') ||
+        currentBanner.image.toLowerCase().includes('/video/upload/')
+      ))
+    )
+  );
+
+  // Điều khiển Tạm dừng / Tiếp tục phát video
+  const togglePlay = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const activeVideo = videoRefs.current[currentBannerIndex];
+    if (activeVideo) {
+      if (activeVideo.paused) {
+        activeVideo.play().then(() => setIsPlaying(true)).catch((err) => {
+          console.warn('Không thể tự động phát:', err);
+        });
+      } else {
+        activeVideo.pause();
+        setIsPlaying(false);
+      }
+    } else {
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  // Điều khiển Bật / Tắt âm thanh
+  const toggleMute = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const activeVideo = videoRefs.current[currentBannerIndex];
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    if (activeVideo) {
+      activeVideo.muted = newMuted;
+      activeVideo.volume = 1;
+      if (!newMuted && activeVideo.paused) {
+        activeVideo.play().then(() => setIsPlaying(true)).catch(() => {});
+      }
+    }
+  };
+
+  // Đồng bộ trạng thái âm thanh & phát trực tiếp vào DOM property của thẻ video
+  useEffect(() => {
+    const activeVideo = videoRefs.current[currentBannerIndex];
+    if (activeVideo) {
+      activeVideo.muted = isMuted;
+      if (!isMuted) {
+        activeVideo.volume = 1;
+      }
+      if (isPlaying && activeVideo.paused) {
+        activeVideo.play().catch(() => {});
+      } else if (!isPlaying && !activeVideo.paused) {
+        activeVideo.pause();
+      }
+    }
+  }, [currentBannerIndex, isMuted, isPlaying]);
+
   // States for the search feature
   const [searchTerm, setSearchTerm] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -37,7 +111,7 @@ const Home = () => {
 
   // State and Ref for scroll animations
   const [visibleSections, setVisibleSections] = useState({
-    banner: false,
+    banner: true,
     features: false,
     menuSection: false,
     menuItems: false, // State độc lập dành riêng cho việc load lại danh sách món ăn
@@ -272,32 +346,212 @@ const Home = () => {
         .animate-pop-in { animation: pop-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
       
-      {/* ================= SECTION 1: HERO BANNER (NEW DESIGN) ================= */}
+      {/* ================= SECTION 1: HERO BANNER (FULL WIDTH & FULL SCREEN 100VH TRÊN DESKTOP) ================= */}
       <section 
         ref={bannerRef}
         data-section="banner"
-        className={`relative w-full ${banners.length > 0 ? '' : 'py-20 md:py-32'} overflow-hidden rounded-3xl mb-24 bg-gradient-to-br from-sky-100 via-blue-50 to-white transition-all duration-1000 transform ${visibleSections.banner ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'}`}
+        className={`relative w-full ${banners.length > 0 ? '' : 'py-12 sm:py-20 md:py-36'} overflow-hidden rounded-none mb-8 sm:mb-12 md:mb-16 bg-black transition-[opacity,transform] duration-700 ease-out transform ${visibleSections.banner ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
       >
         {banners.length > 0 ? (
-           <div className="relative w-full aspect-[4/3] md:aspect-[21/9] max-h-[600px]">
-              {banners.map((banner, index) => (
-                 <div key={banner._id} className={`absolute inset-0 transition-opacity duration-1000 ${index === currentBannerIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-                    <img src={banner.image} alt={banner.title} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10 flex items-center justify-center flex-col p-6">
-                        <h2 className="text-white text-3xl md:text-5xl lg:text-6xl font-black drop-shadow-xl text-center mb-6 max-w-4xl">{banner.title}</h2>
-                        {banner.linkUrl && (
-                           <Link to={banner.linkUrl} className="bg-sky-500 hover:bg-sky-600 text-white px-8 py-4 rounded-full font-bold text-lg shadow-lg hover:scale-105 transition-transform">Khám Phá Ngay</Link>
-                        )}
+           <>
+              {/* Khung Banner Rộng Full Màn Hình & Vừa Vặn Trọn Vẹn Viewport Dưới Header (Không bị lọt hay tràn nếp gấp) */}
+              <div className="relative w-full aspect-[16/9] sm:aspect-[21/9] md:aspect-auto md:h-[calc(100vh-92px)] md:max-h-[calc(100vh-92px)] min-h-[260px] sm:min-h-[380px] md:min-h-0 overflow-hidden rounded-none bg-black">
+                 {banners.map((banner, index) => {
+                    const isVideo = banner.mediaType === 'video' || 
+                      (typeof banner.image === 'string' && (
+                        banner.image.toLowerCase().endsWith('.mp4') || 
+                        banner.image.toLowerCase().endsWith('.webm') || 
+                        banner.image.toLowerCase().endsWith('.mov') || 
+                        banner.image.toLowerCase().includes('/video/upload/')
+                      ));
+
+                    const content = (
+                       <div className="relative w-full h-full select-none">
+                          {/* Media: Video lặp vô tận hoặc Hình ảnh (Đã tối ưu Cloudinary q_auto, f_auto, ac_none & Poster Frame) */}
+                          {isVideo ? (
+                             <video 
+                                ref={(el) => { if (el) videoRefs.current[index] = el; }}
+                                src={getOptimizedVideoUrl(banner.image)} 
+                                poster={getVideoPosterUrl(banner.image) || undefined}
+                                autoPlay 
+                                loop 
+                                muted={isMuted}
+                                playsInline 
+                                webkit-playsinline="true"
+                                preload={index === currentBannerIndex ? "auto" : "none"}
+                                onPlay={() => { if (index === currentBannerIndex) setIsPlaying(true); }}
+                                onPause={() => { if (index === currentBannerIndex) setIsPlaying(false); }}
+                                className="w-full h-full object-cover object-center pointer-events-none select-none rounded-none [image-rendering:-webkit-optimize-contrast]" 
+                             />
+                          ) : (
+                             <img 
+                                src={getOptimizedImageUrl(banner.image)} 
+                                alt={banner.title} 
+                                loading={index === 0 ? "eager" : "lazy"}
+                                className="w-full h-full object-cover object-center pointer-events-none select-none transform-gpu rounded-none" 
+                             />
+                          )}
+
+                          {/* Lớp phủ Tiêu đề & Nút (Định vị tự do posX/posY, kiểu chữ sang trọng như LV) */}
+                          {banner.showContent !== false && (
+                             <div 
+                                className="absolute pointer-events-none z-2 w-max max-w-[92%] sm:max-w-2xl md:max-w-4xl px-4 py-2"
+                                style={{
+                                   left: `${banner.posX !== undefined ? banner.posX : 50}%`,
+                                   top: `${banner.posY !== undefined ? banner.posY : 50}%`,
+                                   transform: 'translate(-50%, -50%)',
+                                   textAlign: banner.textAlign || 'center'
+                                }}
+                             >
+                                <div className={`flex flex-col ${
+                                   banner.textAlign === 'left' ? 'items-start text-left' :
+                                   banner.textAlign === 'right' ? 'items-end text-right' :
+                                   'items-center text-center'
+                                }`}>
+                                   {/* Phụ đề (Subtitle phong cách Louis Vuitton) */}
+                                   {banner.subtitle && (
+                                      <p className="text-white/95 text-xs sm:text-sm md:text-base font-semibold tracking-[0.25em] uppercase mb-1.5 sm:mb-2.5 drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] select-none">
+                                         {banner.subtitle}
+                                      </p>
+                                   )}
+
+                                   {/* Tiêu đề chính */}
+                                   <h2 className="text-white text-xl xs:text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-normal sm:font-medium tracking-normal drop-shadow-[0_3px_14px_rgba(0,0,0,0.9)] leading-tight select-none mb-3 sm:mb-4">
+                                      {banner.title}
+                                   </h2>
+
+                                   {/* Nút bấm / Link điều hướng kiểu gạch chân sang trọng (Chỉ click vào nút này mới chuyển trang) */}
+                                   {banner.linkUrl && (
+                                      typeof banner.linkUrl === 'string' && (banner.linkUrl.startsWith('http://') || banner.linkUrl.startsWith('https://')) ? (
+                                         <a 
+                                            href={banner.linkUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex flex-col items-center group/btn mt-1 select-none pointer-events-auto cursor-pointer"
+                                         >
+                                            <span className="text-white text-sm sm:text-base md:text-lg font-medium tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] transition-transform duration-300 group-hover/btn:translate-y-[-1px]">
+                                               {banner.buttonText || 'Khám phá thêm'}
+                                            </span>
+                                            <span className="w-full h-[1.5px] bg-white mt-1 shadow-sm transition-all duration-300 group-hover/btn:scale-x-110" />
+                                         </a>
+                                      ) : (
+                                         <Link 
+                                            to={banner.linkUrl}
+                                            className="inline-flex flex-col items-center group/btn mt-1 select-none pointer-events-auto cursor-pointer"
+                                         >
+                                            <span className="text-white text-sm sm:text-base md:text-lg font-medium tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] transition-transform duration-300 group-hover/btn:translate-y-[-1px]">
+                                               {banner.buttonText || 'Khám phá thêm'}
+                                            </span>
+                                            <span className="w-full h-[1.5px] bg-white mt-1 shadow-sm transition-all duration-300 group-hover/btn:scale-x-110" />
+                                         </Link>
+                                      )
+                                   )}
+                                </div>
+                             </div>
+                          )}
+                       </div>
+                    );
+
+                    // Khi ẩn chữ (showContent === false) mới cho phép click toàn bộ banner
+                    const isClickableWholeBanner = banner.showContent === false && !!banner.linkUrl;
+                    const isExternal = typeof banner.linkUrl === 'string' && (banner.linkUrl.startsWith('http://') || banner.linkUrl.startsWith('https://'));
+
+                    return (
+                       <div 
+                          key={banner._id} 
+                          className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+                             index === currentBannerIndex ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                          }`}
+                       >
+                          {isClickableWholeBanner ? (
+                             isExternal ? (
+                                <a 
+                                   href={banner.linkUrl} 
+                                   target="_blank" 
+                                   rel="noopener noreferrer" 
+                                   className="block w-full h-full cursor-pointer"
+                                   title={banner.title}
+                                >
+                                   {content}
+                                </a>
+                             ) : (
+                                <Link 
+                                   to={banner.linkUrl} 
+                                   className="block w-full h-full cursor-pointer"
+                                   title={banner.title}
+                                >
+                                   {content}
+                                </Link>
+                             )
+                          ) : (
+                             content
+                          )}
+                       </div>
+                    );
+                 })}
+
+                 {/* Dots chuyển banner nổi tinh tế ở đáy banner */}
+                 {banners.length > 1 && (
+                    <div className="absolute bottom-2 sm:bottom-3 left-1/2 -translate-x-1/2 z-40 flex items-center justify-center gap-1.5 sm:gap-2 pointer-events-auto">
+                       {banners.map((_, idx) => (
+                          <button 
+                             key={idx} 
+                             type="button"
+                             onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setCurrentBannerIndex(idx);
+                             }} 
+                             className="group/dash py-2 px-1 cursor-pointer flex items-center"
+                             aria-label={`Chuyển tới banner ${idx + 1}`}
+                          >
+                             <span 
+                                className={`h-[2px] transition-all duration-300 rounded-full drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)] ${
+                                   idx === currentBannerIndex 
+                                      ? 'w-7 sm:w-8 bg-white opacity-100' 
+                                      : 'w-4 sm:w-5 bg-white/45 group-hover/dash:bg-white/80 group-hover/dash:w-5 sm:group-hover/dash:w-6'
+                                }`} 
+                             />
+                          </button>
+                       ))}
                     </div>
-                 </div>
-              ))}
-              {/* Dots */}
-              <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
-                 {banners.map((_, idx) => (
-                    <button key={idx} onClick={() => setCurrentBannerIndex(idx)} className={`w-3 h-3 rounded-full transition-colors ${idx === currentBannerIndex ? 'bg-sky-500' : 'bg-white/50'}`}></button>
-                 ))}
+                 )}
+
+                 {/* Nút Điều Khiển 1: Tạm dừng / Tiếp tục phát video (Góc Dưới Bên Trái - Trơn không viền tròn, đặt sát mép) */}
+                 {isCurrentVideo && (
+                    <button
+                       type="button"
+                       onClick={togglePlay}
+                       className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 z-40 p-1 text-white/80 hover:text-white hover:scale-110 active:scale-90 transition-all duration-200 cursor-pointer pointer-events-auto drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]"
+                       title={isPlaying ? 'Tạm dừng video' : 'Tiếp tục phát'}
+                       aria-label={isPlaying ? 'Tạm dừng video' : 'Tiếp tục phát'}
+                    >
+                       {isPlaying ? (
+                          <FiPause className="w-4 h-4 sm:w-5 sm:h-5" />
+                       ) : (
+                          <FiPlay className="w-4 h-4 sm:w-5 sm:h-5" />
+                       )}
+                    </button>
+                 )}
+
+                 {/* Nút Điều Khiển 2: Bật / Tắt âm thanh video (Góc Dưới Bên Phải - Trơn không viền tròn, đặt sát mép) */}
+                 {isCurrentVideo && (
+                    <button
+                       type="button"
+                       onClick={toggleMute}
+                       className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 z-40 p-1 text-white/80 hover:text-white hover:scale-110 active:scale-90 transition-all duration-200 cursor-pointer pointer-events-auto drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]"
+                       title={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+                       aria-label={isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+                    >
+                       {isMuted ? (
+                          <FiVolumeX className="w-4 h-4 sm:w-5 sm:h-5" />
+                       ) : (
+                          <FiVolume2 className="w-4 h-4 sm:w-5 sm:h-5 text-sky-400" />
+                       )}
+                    </button>
+                 )}
               </div>
-           </div>
+           </>
         ) : (
           <>
           {/* Floating Images */}
@@ -313,7 +567,7 @@ const Home = () => {
               className="absolute w-40 md:w-64 bottom-5 right-5 md:right-20 rounded-3xl shadow-xl animate-float-2"
             />
             <img 
-              src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?q=80&w=1000&auto=format&fit=crop"
+              src="https://images.unsplash.com/photo-1571091718767-18b5b1457add?q=80&w=1000&auto=format&fit=crop" 
               alt="Floating Burger" 
               className="absolute w-32 md:w-56 top-1/4 right-1/4 rounded-full shadow-xl animate-float-3"
             />
@@ -342,20 +596,19 @@ const Home = () => {
         )}
       </section>
 
-      {/* ================= SECTION 1.5: SERVICE ADVANTAGES ================= */}
-      <section ref={featuresRef} data-section="features" className="py-24 md:py-32 bg-slate-50">
+      {/* ================= SECTION 1.5: SERVICE ADVANTAGES (Tối ưu gọn gàng trên Mobile) ================= */}
+      <section ref={featuresRef} data-section="features" className="py-8 sm:py-12 md:py-24 bg-slate-50">
         <div className="container mx-auto px-4">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-black text-slate-800 mb-4"
-            >
+          <div className="text-center max-w-2xl mx-auto mb-6 sm:mb-8 md:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-slate-800 mb-1.5 md:mb-4">
               Một Trải Nghiệm Khó Quên
             </h2>
-            <p className="text-gray-600 text-lg">
+            <p className="text-gray-500 text-xs sm:text-sm md:text-lg max-w-xl mx-auto">
               Chúng tôi cam kết mang đến không chỉ một bữa ăn, mà là một khoảnh khắc đáng nhớ dành cho bạn.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-8">
             {[
               { icon: '🛵', title: 'Giao Hàng Siêu Tốc', desc: 'Nóng hổi và tươi ngon tận cửa nhà bạn chỉ trong 30 phút.' },
               { icon: '🥩', title: '100% Nguyên Liệu Tươi', desc: 'Được lấy hàng ngày từ các đối tác địa phương tin cậy.' },
@@ -363,15 +616,17 @@ const Home = () => {
             ].map((feature, index) => (
               <div 
                 key={index} 
-                className={`bg-white p-8 rounded-3xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] active:scale-95 hover:-translate-y-2 transition-all duration-300 text-center transform cursor-pointer select-none ${visibleSections.features ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'} ${clickedFeatures.has(index) ? 'border-2 border-orange-400/50' : 'border-2 border-transparent'}`}
+                className={`bg-white p-3.5 sm:p-5 md:p-8 rounded-2xl md:rounded-3xl shadow-[0_4px_12px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_20px_rgba(0,0,0,0.08)] active:scale-95 hover:-translate-y-1.5 transition-all duration-300 flex flex-row md:flex-col items-center md:text-center text-left gap-3.5 sm:gap-4 md:gap-0 transform cursor-pointer select-none ${visibleSections.features ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'} ${clickedFeatures.has(index) ? 'border-2 border-orange-400/50' : 'border-2 border-transparent'}`}
                 style={{ transitionDelay: `${index * 150}ms` }}
                 onClick={(e) => handleFeatureBoxClick(e, index)}
               >
-                <div className="w-20 h-20 bg-slate-100 rounded-2xl flex items-center justify-center mb-6 mx-auto">
-                  <span className="text-4xl">{feature.icon}</span>
+                <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-20 md:h-20 bg-slate-100 rounded-xl md:rounded-2xl flex items-center justify-center md:mb-6 md:mx-auto flex-shrink-0 shadow-inner">
+                  <span className="text-2xl sm:text-3xl md:text-4xl">{feature.icon}</span>
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-3">{feature.title}</h3>
-                <p className="text-gray-500 leading-relaxed">{feature.desc}</p>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm sm:text-base md:text-xl font-bold text-slate-800 mb-0.5 sm:mb-1 md:mb-3">{feature.title}</h3>
+                  <p className="text-gray-500 text-xs sm:text-sm md:text-base leading-relaxed line-clamp-2 md:line-clamp-none">{feature.desc}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -391,9 +646,9 @@ const Home = () => {
       >
         <div className="flex flex-col md:flex-row gap-8">
           
-          <div className="w-full md:w-1/4">
-            {/* Desktop Categories: Vertical Sidebar */}
-            <div className={`hidden md:block bg-white p-6 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.05)] border border-slate-100/80 sticky top-28 transition-all duration-1000 transform ${visibleSections.menuSection ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-16'}`}
+          {/* ================= DESKTOP SIDEBAR: DANH MỤC DỌC ================= */}
+          <div className="hidden md:block w-full md:w-1/4">
+            <div className={`bg-white p-6 rounded-3xl shadow-[0_4px_16px_rgba(0,0,0,0.05)] border border-slate-100/80 sticky top-28 transition-all duration-1000 transform ${visibleSections.menuSection ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-16'}`}
             >
               <h2 className="text-xl font-black text-slate-800 mb-4 border-b border-slate-100 pb-4">DANH MỤC</h2>
               <ul className="space-y-2 font-bold">
@@ -423,59 +678,32 @@ const Home = () => {
                 ))}
               </ul>
             </div>
-            
-            {/* Mobile Categories: Horizontal Scroll */}
-            <div className="block md:hidden mb-6">
-              <ul className="flex flex-row items-center gap-3 overflow-x-auto no-scrollbar snap-x">
-              <li 
-                  key="ALL"
-                  onClick={() => handleCategoryChange('ALL')}
-                  className={`snap-start flex-shrink-0 cursor-pointer flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-colors duration-300 w-24 h-24 border-2 ${
-                    selectedCategory === 'ALL'
-                      ? 'bg-sky-500 text-white border-sky-500'
-                      : 'bg-white text-slate-600 border-slate-100'
-                  }`}
-                >
-                  <span className="text-3xl">🍽️</span> 
-                  <span className="text-xs font-bold text-center">Tất Cả</span>
-                </li>
-                {categories.map(cat => (
-                  <li 
-                    key={cat._id}
-                    onClick={() => handleCategoryChange(cat.slug)}
-                    className={`snap-start flex-shrink-0 cursor-pointer flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-colors duration-300 w-24 h-24 border-2 ${
-                      selectedCategory === cat.slug
-                        ? 'bg-sky-500 text-white border-sky-500'
-                        : 'bg-white text-slate-600 border-slate-100'
-                    }`}
-                  >
-                    <span className="text-3xl">{cat.image || '🍽️'}</span> 
-                    <span className="text-xs font-bold text-center">{cat.name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
 
+          {/* ================= KHU VỰC THỰC ĐƠN CHÍNH ================= */}
           <div className="w-full md:w-3/4">
-            <h2 className="text-3xl font-black text-slate-800 mb-6 uppercase flex items-center gap-2"
-            >
-              🔥 Thực Đơn Hôm Nay
-            </h2>
             
-            <form onSubmit={handleSearchSubmit} className="mb-8 relative" ref={searchRef}>
+            {/* 1. Tiêu đề mục thực đơn */}
+            <div className="flex items-center justify-between mb-4 md:mb-6">
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-800 uppercase flex items-center gap-2">
+                🔥 Thực Đơn Hôm Nay
+              </h2>
+            </div>
+            
+            {/* 2. Thanh tìm kiếm món ăn tinh gọn */}
+            <form onSubmit={handleSearchSubmit} className="mb-4 md:mb-6 relative" ref={searchRef}>
                 <input
                   type="text"
-                  placeholder="Tìm kiếm món ăn (VD: Burger...)"
+                  placeholder="Tìm kiếm món ăn (VD: Burger, Gà rán...)"
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
                     setShowSuggestions(e.target.value.length > 0);
                   }}
                   onFocus={() => setShowSuggestions(true)}
-                  className="w-full pl-14 pr-4 py-5 rounded-3xl border border-slate-200 shadow-lg shadow-black/5 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition text-md font-medium"
+                  className="w-full pl-11 sm:pl-14 pr-4 py-3 sm:py-4 rounded-2xl md:rounded-3xl border border-slate-200 shadow-sm focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition text-sm sm:text-base font-medium placeholder-slate-400"
                 />
-                <span className="absolute left-5 top-1/2 transform -translate-y-1/2 text-2xl">🔍</span>
+                <span className="absolute left-4 sm:left-5 top-1/2 transform -translate-y-1/2 text-lg sm:text-2xl">🔍</span>
                 
                 {showSuggestions && searchTerm && (
                   <div className="absolute z-20 w-full bg-white mt-2 rounded-2xl shadow-xl border border-gray-100 overflow-hidden max-h-80 overflow-y-auto">
@@ -509,6 +737,40 @@ const Home = () => {
                   </div>
                 )}
             </form>
+
+            {/* 3. Dải danh mục Capsule / Pill Tabs (Hiện trên Mobile, cuộn ngang mượt mà) */}
+            <div className="block md:hidden mb-6">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+                <button
+                  key="ALL"
+                  type="button"
+                  onClick={() => handleCategoryChange('ALL')}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
+                    selectedCategory === 'ALL'
+                      ? 'bg-sky-500 text-white shadow-md shadow-sky-500/25'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="text-sm">🍽️</span>
+                  <span>Tất Cả</span>
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={cat._id}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat.slug)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
+                      selectedCategory === cat.slug
+                        ? 'bg-sky-500 text-white shadow-md shadow-sky-500/25'
+                        : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-sm">{cat.image || '🍽️'}</span>
+                    <span>{cat.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {loading ? (
               <div className="flex justify-center items-center py-20 text-zinc-500 font-bold"
@@ -618,22 +880,21 @@ const Home = () => {
           <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-sky-400/50 opacity-20 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="w-full md:w-3/5 relative z-10 text-center md:text-left mb-10 md:mb-0">
-            <h2 className="text-3xl md:text-5xl font-black mb-6 leading-tight"
-            >
-              Tải Ứng Dụng Ngay <br/> Nhận Quà Liền Tay!
+            <h2 className="text-3xl md:text-5xl font-black mb-6 leading-tight">
+              Tải Ứng Dụng Ngay <br/> Sắp Ra Mắt (Coming Soon)!
             </h2>
             <p className="text-sky-100 text-lg md:text-xl mb-10 max-w-lg mx-auto md:mx-0">
-              Nhập mã <span className="font-bold text-white bg-sky-500/50 px-3 py-1.5 rounded-lg ml-1 mr-1">NEWAPP50</span> để được giảm ngay 50K cho đơn hàng đầu tiên trên ứng dụng di động.
+              Ứng dụng DualeoFood sắp chính thức có mặt trên di động. Hãy đón chờ phiên bản dành riêng cho <span className="font-bold text-white bg-sky-500/50 px-3 py-1.5 rounded-lg ml-1 mr-1">iOS & Android</span> với vô vàn ưu đãi bùng nổ!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
               <button className="bg-white hover:bg-sky-100 text-sky-600 font-bold py-4 px-8 rounded-full flex items-center justify-center gap-3 transition transform hover:-translate-y-1 shadow-lg active:scale-95">
-                App Store
+                App Store (Coming Soon)
               </button>
               <button 
                 onClick={handleFeatureBoxClick}
                 className="bg-white hover:bg-sky-100 text-sky-600 font-bold py-4 px-8 rounded-full flex items-center justify-center gap-3 transition transform hover:-translate-y-1 shadow-lg active:scale-95"
               >
-                Google Play
+                Google Play (Coming Soon)
               </button>
             </div>
           </div>
@@ -644,8 +905,12 @@ const Home = () => {
               <div className="w-32 h-6 bg-slate-900 absolute top-0 rounded-b-3xl"></div>
               <div className="text-5xl mb-6 mt-4 animate-bounce">🍔</div>
               <h3 className="text-white font-black text-2xl mb-8">DualeoFood</h3>
-              <div className="w-48 h-32 bg-slate-700 rounded-2xl mb-4 animate-pulse"></div>
-              <div className="w-48 h-12 bg-sky-500 rounded-full animate-pulse mt-4"></div>
+              <div className="w-48 h-32 bg-slate-700 rounded-2xl mb-4 animate-pulse flex items-center justify-center">
+                <span className="text-xs font-bold text-sky-300 uppercase tracking-widest">Coming Soon</span>
+              </div>
+              <div className="w-48 h-12 bg-sky-500 rounded-full animate-pulse mt-4 flex items-center justify-center text-white text-xs font-bold">
+                Sắp Ra Mắt
+              </div>
             </div>
           </div>
         </div>

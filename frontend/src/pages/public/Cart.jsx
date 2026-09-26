@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { removeFromCart, updateQuantity, clearCart, addToCart } from '../../redux/cartSlice';
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import toast from 'react-hot-toast';
 import { useAddToCartAnimation } from '../../hooks/useAddToCartAnimation';
-import { FiPlus, FiMinus, FiTrash2, FiTag } from 'react-icons/fi';
+import { FiPlus, FiMinus, FiTrash2, FiTag, FiChevronLeft, FiChevronRight, FiPercent, FiGift, FiZap } from 'react-icons/fi';
 
 // --- Component con: Modal chọn Voucher ---
 const VoucherModal = ({ isOpen, onClose, vouchers, onSelectVoucher, onApplyCode, totalPrice }) => {
@@ -78,25 +78,52 @@ const VoucherModal = ({ isOpen, onClose, vouchers, onSelectVoucher, onApplyCode,
   );
 };
 
-// --- Component con: Card sản phẩm gợi ý ---
-const SuggestedProductCard = ({ product, onAddToCart }) => (
-  <div className="product-card-suggested snap-start flex-shrink-0 w-48 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 group hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-    <div className="w-full aspect-square bg-slate-50 rounded-xl mb-3 overflow-hidden">
-      <img src={`${getImageUrl(product.image)}`} alt={product.name} className="product-image w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" />
+// --- Component con: Card sản phẩm gợi ý Mua kèm deal sốc ---
+const SuggestedProductCard = ({ product, onAddToCart }) => {
+  // Tính giá gốc tượng trưng cao hơn 15% để tôn vinh deal sốc
+  const originalPrice = Math.round((product.price * 1.15) / 1000) * 1000;
+
+  return (
+    <div className="product-card-suggested snap-start flex-shrink-0 w-44 sm:w-48 bg-white rounded-2xl shadow-xs border border-slate-100 p-3 sm:p-3.5 group hover:shadow-md hover:border-sky-200 transition-all duration-300 relative flex flex-col justify-between">
+      {/* Badge Deal Sốc */}
+      <span className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md bg-gradient-to-r from-red-500 to-amber-500 text-white text-[10px] font-black shadow-xs">
+        DEAL SỐC
+      </span>
+
+      <div>
+        <div className="w-full aspect-square bg-slate-50 rounded-xl mb-2.5 overflow-hidden relative">
+          <img 
+            src={`${getImageUrl(product.image)}`} 
+            alt={product.name} 
+            className="product-image w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+          />
+        </div>
+        <h4 className="font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 h-9" title={product.name}>
+          {product.name}
+        </h4>
+      </div>
+
+      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+        <div>
+          <p className="font-black text-sky-600 text-sm sm:text-base leading-tight">
+            {product.price.toLocaleString('vi-VN')}đ
+          </p>
+          <p className="text-[10px] text-slate-400 line-through">
+            {originalPrice.toLocaleString('vi-VN')}đ
+          </p>
+        </div>
+        <button 
+          onClick={(e) => onAddToCart(product, e)}
+          className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-500 text-sky-600 hover:text-white rounded-xl font-bold text-xs transition-all duration-200 active:scale-90 flex items-center gap-1 cursor-pointer border border-sky-200 hover:border-sky-500"
+          title="Thêm món này vào giỏ hàng"
+        >
+          <FiPlus size={14} />
+          <span>Thêm</span>
+        </button>
+      </div>
     </div>
-    <h4 className="font-bold text-sm text-slate-700 line-clamp-2 h-10">{product.name}</h4>
-    <div className="flex justify-between items-center mt-2">
-      <p className="font-black text-sky-500 text-lg">{product.price.toLocaleString('vi-VN')}đ</p>
-      <button 
-        onClick={(e) => onAddToCart(product, e)}
-        className="w-9 h-9 flex items-center justify-center bg-sky-100 text-sky-600 rounded-full hover:bg-sky-500 hover:text-white transition-all duration-300 active:scale-90"
-        title="Thêm vào giỏ"
-      >
-        <FiPlus size={20} />
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 
 // --- Component chính: Trang Giỏ hàng ---
@@ -142,13 +169,43 @@ const Cart = () => {
     const fetchSuggestedProducts = async () => {
       try {
         const res = await axios.get('/products/pinned/all');
-        setSuggestedProducts(res.data.products || []);
+        let products = res.data.products || [];
+        // Nếu sản phẩm ghim ít hơn 8 món, lấy thêm từ danh sách chung để luôn có gợi ý phong phú
+        if (products.length < 8) {
+          const generalRes = await axios.get('/products?limit=16');
+          const generalProducts = generalRes.data.products || [];
+          const existingIds = new Set(products.map(p => String(p._id)));
+          for (const gp of generalProducts) {
+            if (!existingIds.has(String(gp._id))) {
+              products.push(gp);
+            }
+          }
+        }
+        setSuggestedProducts(products);
       } catch (error) {
         console.error("Lỗi lấy sản phẩm gợi ý:", error);
       }
     };
     fetchSuggestedProducts();
   }, [token]);
+
+  // Ref và hàm cuộn ngang danh sách Mua kèm deal sốc
+  const suggestedScrollRef = useRef(null);
+  const scrollSuggested = (direction) => {
+    if (suggestedScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -220 : 220;
+      suggestedScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  // LỌC SẠCH: Loại bỏ hoàn toàn các món đã có trong giỏ hàng (không bao giờ bị trùng)
+  const cartItemIds = useMemo(() => {
+    return new Set(cartItems.map(item => String(item.id || item._id)));
+  }, [cartItems]);
+
+  const filteredSuggestedProducts = useMemo(() => {
+    return suggestedProducts.filter(p => !cartItemIds.has(String(p._id)));
+  }, [suggestedProducts, cartItemIds]);
 
   // 3. Hàm tính toán và áp dụng voucher
   const handleApplyVoucher = (voucherItem) => {
@@ -170,20 +227,16 @@ const Cart = () => {
   // Hàm xử lý khi người dùng nhập mã tay
   const handleApplyManualCode = async (code) => {
     try {
-      // Giả sử bạn đã có endpoint GET /api/coupons/code/:code
       const res = await axios.get(`/coupons/code/${code}`);
       const coupon = res.data;
 
-      // Tạo một đối tượng voucher tạm thời để xử lý
       const manualVoucherItem = {
         coupon: coupon,
-        isManual: true, // Đánh dấu đây là voucher nhập tay
-        _id: `manual_${coupon._id}` // Tạo ID tạm để React phân biệt
+        isManual: true,
+        _id: `manual_${coupon._id}`
       };
 
-      // Gọi lại hàm apply có sẵn để kiểm tra điều kiện và tính toán
       handleApplyVoucher(manualVoucherItem);
-
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Mã không hợp lệ hoặc đã có lỗi xảy ra.';
       toast.error(errorMsg);
@@ -257,7 +310,7 @@ const Cart = () => {
       ) : (
         <div className="flex flex-col lg:flex-row gap-10">
           {/* Cột trái: Danh sách sản phẩm và gợi ý */}
-          <div className="w-full lg:w-3/5 space-y-8">
+          <div className="w-full lg:w-3/5 space-y-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-sky-50">
               <div className="flex justify-between items-center mb-6 border-b pb-4">
               <span className="font-bold text-gray-700">{cartItems.length} món trong giỏ</span>
@@ -286,12 +339,51 @@ const Cart = () => {
             </div>
             </div>
 
-            {/* Khu vực "Mua kèm deal sốc" */}
-            {suggestedProducts.length > 0 && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-sky-50">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">🔥 Mua kèm deal sốc</h3>
-                <div className="flex gap-4 overflow-x-auto pb-2 -mx-6 px-6 no-scrollbar snap-x">
-                  {suggestedProducts.map(p => (
+            {/* Khu vực "Mua kèm deal sốc" (Không bao giờ trùng món trong giỏ) */}
+            {filteredSuggestedProducts.length > 0 && (
+              <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-sky-100/80">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <FiZap className="w-5 h-5 text-amber-500 fill-amber-400 shrink-0" />
+                    <div>
+                      <h3 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
+                        Mua Kèm Deal Sốc
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-100 text-red-600 border border-red-200">
+                          TIẾT KIỆM HƠN
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400 font-medium">
+                        Món ngon giá ưu đãi khi mua cùng giỏ hàng của bạn
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Nút cuộn trái/phải trên desktop */}
+                  <div className="hidden sm:flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => scrollSuggested('left')}
+                      className="w-8 h-8 rounded-full bg-slate-100 hover:bg-sky-100 text-slate-600 hover:text-sky-600 flex items-center justify-center transition cursor-pointer"
+                      title="Cuộn sang trái"
+                    >
+                      <FiChevronLeft size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollSuggested('right')}
+                      className="w-8 h-8 rounded-full bg-slate-100 hover:bg-sky-100 text-slate-600 hover:text-sky-600 flex items-center justify-center transition cursor-pointer"
+                      title="Cuộn sang phải"
+                    >
+                      <FiChevronRight size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  ref={suggestedScrollRef}
+                  className="flex gap-3.5 sm:gap-4 overflow-x-auto pb-2 -mx-5 px-5 sm:-mx-6 sm:px-6 no-scrollbar snap-x scroll-smooth"
+                >
+                  {filteredSuggestedProducts.map(p => (
                     <SuggestedProductCard key={p._id} product={p} onAddToCart={handleAddSuggestedToCart} />
                   ))}
                 </div>
