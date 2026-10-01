@@ -648,7 +648,10 @@ const Blog = () => {
                             if (!a.isPinned && b.isPinned) return 1;
                             return new Date(b.createdAt) - new Date(a.createdAt);
                         }).map((story, idx) => {
-                            const isMyStory = userInfo && ((story.user?._id && String(story.user._id) === String(userInfo._id || userInfo.id)) || (story.user && String(story.user) === String(userInfo._id || userInfo.id)));
+                            const isMyStory = userInfo && ((story.user?._id && String(story.user._id) === String(userInfo._id || userInfo.id)) || (story.user && String(story.user) === String(userInfo._id || userInfo.id)) || (story.userId && String(story.userId) === String(userInfo._id || userInfo.id)));
+                            const storyAvatar = (isMyStory && userInfo?.avatar) 
+                                ? userInfo.avatar 
+                                : (story.user?.avatar || story.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(story.author || story.title || 'User')}&background=0284c7&color=fff`);
                             const isPending = story.status === 'pending';
                             const isPinned = Boolean(story.isPinned);
 
@@ -674,12 +677,12 @@ const Blog = () => {
                                         }`}>
                                             <div className="p-0.5 bg-white rounded-full">
                                                 <img
-                                                    src={story.avatar || "https://ui-avatars.com/api/?name=DF&background=0284c7&color=fff"}
+                                                    src={storyAvatar}
                                                     alt={story.title}
                                                     className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover"
                                                     onError={(e) => {
                                                         e.target.onerror = null;
-                                                        e.target.src = "https://ui-avatars.com/api/?name=Story&background=0284c7&color=fff";
+                                                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(story.author || story.title || 'User')}&background=0284c7&color=fff`;
                                                     }}
                                                 />
                                             </div>
@@ -1481,34 +1484,44 @@ const Blog = () => {
                         </div>
 
                         {/* Tác giả Story & Nút Xóa nếu là chủ sở hữu */}
-                        <div className="flex items-center justify-between z-20 mt-3">
-                            <div className="flex items-center gap-3">
-                                <img
-                                    src={stories[activeStoryIndex].avatar || "https://ui-avatars.com/api/?name=DF&background=0284c7&color=fff"}
-                                    alt="Story Author"
-                                    className="w-9 h-9 rounded-full object-cover border-2 border-white"
-                                    onError={(e) => {
-                                        e.target.onerror = null;
-                                        e.target.src = "https://ui-avatars.com/api/?name=Story&background=0284c7&color=fff";
-                                    }}
-                                />
-                                <div>
-                                    <p className="font-bold text-xs">{stories[activeStoryIndex].author}</p>
-                                    <p className="text-[10px] text-white/70">Story ẩm thực • DualeoFood</p>
-                                </div>
-                            </div>
+                        {(() => {
+                            const curStory = stories[activeStoryIndex];
+                            const curIsMine = userInfo && ((curStory?.user?._id && String(curStory.user._id) === String(userInfo._id || userInfo.id)) || (curStory?.user && String(curStory.user) === String(userInfo._id || userInfo.id)) || (curStory?.userId && String(curStory.userId) === String(userInfo._id || userInfo.id)));
+                            const activeStoryAvatar = (curIsMine && userInfo?.avatar) 
+                                ? userInfo.avatar 
+                                : (curStory?.user?.avatar || curStory?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(curStory?.author || 'User')}&background=0284c7&color=fff`);
 
-                            {/* Nút xóa tin nếu là tin của bạn hoặc admin */}
-                            {((stories[activeStoryIndex]?.user && (userInfo?._id === stories[activeStoryIndex]?.user || userInfo?._id === stories[activeStoryIndex]?.user?._id)) || (stories[activeStoryIndex]?.userId && userInfo?._id === stories[activeStoryIndex]?.userId) || userInfo?.role === 'admin') && (
-                                <button
-                                    onClick={(e) => handleDeleteStory(stories[activeStoryIndex]._id || stories[activeStoryIndex].id, e)}
-                                    className="text-white/80 hover:text-rose-400 p-1.5 rounded-full hover:bg-white/10 transition-colors"
-                                    title="Xóa Story này"
-                                >
-                                    <FiTrash2 className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
+                            return (
+                                <div className="flex items-center justify-between z-20 mt-3">
+                                    <div className="flex items-center gap-3">
+                                        <img
+                                            src={activeStoryAvatar}
+                                            alt="Story Author"
+                                            className="w-9 h-9 rounded-full object-cover border-2 border-white"
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(curStory?.author || 'User')}&background=0284c7&color=fff`;
+                                            }}
+                                        />
+                                        <div>
+                                            <p className="font-bold text-xs">{curStory?.author}</p>
+                                            <p className="text-[10px] text-white/70">Story ẩm thực • DualeoFood</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Nút xóa tin nếu là tin của bạn hoặc admin */}
+                                    {((curStory?.user && (userInfo?._id === curStory?.user || userInfo?._id === curStory?.user?._id)) || (curStory?.userId && userInfo?._id === curStory?.userId) || userInfo?.role === 'admin') && (
+                                        <button
+                                            onClick={(e) => handleDeleteStory(curStory._id || curStory.id, e)}
+                                            className="text-white/80 hover:text-rose-400 p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                                            title="Xóa Story này"
+                                        >
+                                            <FiTrash2 className="w-4 h-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            );
+                        })()}
 
                         {/* Hình ảnh Story */}
                         <img

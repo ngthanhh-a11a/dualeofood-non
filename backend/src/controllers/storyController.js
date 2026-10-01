@@ -21,9 +21,20 @@ exports.getStories = async (req, res) => {
             filter.$or.push({ user: currentUserId });
         }
 
-        let stories = await Story.find(filter)
+        let rawStories = await Story.find(filter)
+            .populate('user', 'name avatar')
             .sort({ isPinned: -1, createdAt: -1 })
             .limit(50);
+
+        // Luôn đồng bộ avatar và tên người dùng mới nhất từ User collection
+        let stories = rawStories.map(s => {
+            const obj = s.toObject ? s.toObject() : s;
+            return {
+                ...obj,
+                avatar: obj.user?.avatar || obj.avatar || '',
+                author: obj.user?.name || obj.author || 'Thành viên DualeoFood'
+            };
+        });
 
         // Quy tắc sắp xếp theo yêu cầu:
         // 1. Của ai đăng thì người đó hiện đầu tiên
@@ -35,7 +46,8 @@ exports.getStories = async (req, res) => {
             const otherNormal = [];
 
             stories.forEach(s => {
-                if (s.user && s.user.toString() === currentUserId.toString()) {
+                const sUserId = s.user?._id ? s.user._id.toString() : (s.user ? s.user.toString() : '');
+                if (sUserId && sUserId === currentUserId.toString()) {
                     myStories.push(s);
                 } else if (s.isPinned) {
                     otherPinned.push(s);
@@ -60,7 +72,19 @@ exports.getStories = async (req, res) => {
 exports.getMyStories = async (req, res) => {
     try {
         const userId = req.user._id || req.user.id;
-        const stories = await Story.find({ user: userId }).sort({ createdAt: -1 });
+        const rawStories = await Story.find({ user: userId })
+            .populate('user', 'name avatar')
+            .sort({ createdAt: -1 });
+
+        const stories = rawStories.map(s => {
+            const obj = s.toObject ? s.toObject() : s;
+            return {
+                ...obj,
+                avatar: obj.user?.avatar || obj.avatar || '',
+                author: obj.user?.name || obj.author || 'Thành viên DualeoFood'
+            };
+        });
+
         res.json(stories);
     } catch (error) {
         console.error('Lỗi khi lấy Story của tôi:', error);
@@ -93,8 +117,18 @@ exports.getAllStoriesAdmin = async (req, res) => {
             { $set: { btnText: '', link: '' } }
         );
 
-        const stories = await Story.find(query)
+        const rawStories = await Story.find(query)
+            .populate('user', 'name avatar')
             .sort({ isPinned: -1, createdAt: -1 });
+
+        const stories = rawStories.map(s => {
+            const obj = s.toObject ? s.toObject() : s;
+            return {
+                ...obj,
+                avatar: obj.user?.avatar || obj.avatar || '',
+                author: obj.user?.name || obj.author || 'Thành viên DualeoFood'
+            };
+        });
 
         res.json(stories);
     } catch (error) {
