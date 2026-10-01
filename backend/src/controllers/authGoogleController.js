@@ -49,7 +49,7 @@ exports.googleLogin = async (req, res) => {
         const ourToken = jwt.sign(
             { id: user._id, role: user.role },
             process.env.JWT_SECRET || 'dualeofood_secret',
-            { expiresIn: '1d' }
+            { expiresIn: '30d' }
         );
 
         res.status(200).json({

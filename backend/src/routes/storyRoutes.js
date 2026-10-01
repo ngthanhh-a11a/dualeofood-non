@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const storyController = require('../controllers/storyController');
-const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
+const { verifyToken, authorizeRoles, optionalAuth } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('../config/cloudinary');
@@ -19,16 +19,6 @@ const upload = multer({
     storage,
     limits: { fileSize: 5 * 1024 * 1024 } // Giới hạn 5MB
 });
-
-// Middleware lấy user tùy chọn (cho phép khách vãng lai hoặc đã đăng nhập)
-const optionalAuth = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer')) {
-        verifyToken(req, res, next);
-    } else {
-        next();
-    }
-};
 
 const adminOrStaff = authorizeRoles('admin', 'staff');
 

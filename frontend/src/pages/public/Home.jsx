@@ -392,10 +392,13 @@ const Home = () => {
                              />
                           )}
 
+                          {/* Lớp phủ mờ (Dark Overlay / Gradient): Tăng tương phản chữ trắng và làm mịn các vùng màu nền */}
+                          <div className="absolute inset-0 bg-black/25 pointer-events-none z-[1]" />
+
                           {/* Lớp phủ Tiêu đề & Nút (Định vị tự do posX/posY, kiểu chữ sang trọng như LV) */}
                           {banner.showContent !== false && (
                              <div 
-                                className="absolute pointer-events-none z-2 w-max max-w-[92%] sm:max-w-2xl md:max-w-4xl px-4 py-2"
+                                className="absolute pointer-events-none z-[2] w-max max-w-[92%] sm:max-w-2xl md:max-w-4xl px-4 py-2"
                                 style={{
                                    left: `${banner.posX !== undefined ? banner.posX : 50}%`,
                                    top: `${banner.posY !== undefined ? banner.posY : 50}%`,

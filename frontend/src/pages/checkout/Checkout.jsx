@@ -6,6 +6,8 @@ import axios from '../../utils/axiosConfig';
 import { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import { clearCart } from '../../redux/cartSlice'; // 1. Import hành động clearCart
 import { useSocket } from '../../contexts/SocketContext';
+import { FiNavigation } from 'react-icons/fi';
+import { getCurrentCoordinates, reverseGeocodeOSM, getGoogleMapsUrl } from '../../utils/geolocation';
 
 const Checkout = () => {
   const cartItems = useSelector((state) => state.cart?.items || []);
@@ -18,6 +20,7 @@ const Checkout = () => {
 
   const [shippingFeesList, setShippingFeesList] = useState([]);
   const [selectedShippingArea, setSelectedShippingArea] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
 
   // Phí vận chuyển mặc định là 15k nếu chưa load được cài đặt, hoặc lấy từ khu vực được chọn
   const shippingFee = selectedShippingArea ? selectedShippingArea.fee : (shippingFeesList.length > 0 ? shippingFeesList[0].fee : 15000);
@@ -33,7 +36,7 @@ const Checkout = () => {
   const [paymentMethod, setPaymentMethod] = useState('CASH');
 
   const [formData, setFormData] = useState({
-    name: '', phone: '', address: '', note: ''
+    name: '', phone: '', address: '', note: '', location: null
   });
 
   // --- LOGIC MỚI: LẤY VÀ XỬ LÝ SỔ ĐỊA CHỈ ---
@@ -93,9 +96,35 @@ const Checkout = () => {
       name: address.name,
       phone: address.phone,
       address: address.street, // Lưu ý: schema dùng 'street', form dùng 'address'
-      note: '' // Reset ghi chú khi chọn địa chỉ mới
+      note: '', // Reset ghi chú khi chọn địa chỉ mới
+      location: address.location || null
     });
     setIsAddressListOpen(false); // Tự động đóng danh sách sau khi chọn
+  };
+
+  // Tự động định vị GPS và Reverse Geocoding điền vào form thanh toán
+  const handleDetectLocation = async () => {
+    setIsLocating(true);
+    const toastId = toast.loading('Đang lấy tín hiệu GPS...');
+    try {
+      const coords = await getCurrentCoordinates();
+      toast.loading('Đang định vị địa chỉ...', { id: toastId });
+      const streetName = await reverseGeocodeOSM(coords.lat, coords.lng);
+
+      setFormData(prev => ({
+        ...prev,
+        address: streetName || prev.address,
+        location: {
+          lat: coords.lat,
+          lng: coords.lng
+        }
+      }));
+      toast.success('Đã xác định vị trí thành công!', { id: toastId });
+    } catch (error) {
+      toast.error(error.message || 'Không thể lấy vị trí hiện tại.', { id: toastId });
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   // CÁC STATE MỚI ĐỂ QUẢN LÝ LUỒNG THANH TOÁN QR
@@ -242,9 +271,14 @@ const Checkout = () => {
                   {savedAddresses.map(addr => (
                     <div key={addr._id} onClick={() => handleSelectAddress(addr)} className={`p-3 rounded-lg cursor-pointer transition-colors ${selectedAddressId === addr._id ? 'bg-sky-100' : 'hover:bg-sky-50'}`}>
                       <div className="flex justify-between items-baseline">
-                        <p className="font-bold text-gray-800">
-                          {addr.label && <span className="text-xs font-bold text-sky-600 bg-sky-100 px-2 py-1 rounded-full mr-2">{addr.label}</span>}
-                          {addr.name} - {addr.phone}
+                        <p className="font-bold text-gray-800 flex items-center gap-1.5 flex-wrap">
+                          {addr.label && <span className="text-xs font-bold text-sky-600 bg-sky-100 px-2 py-1 rounded-full mr-1">{addr.label}</span>}
+                          <span>{addr.name} - {addr.phone}</span>
+                          {addr.location?.lat && addr.location?.lng && (
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/60">
+                              GPS
+                            </span>
+                          )}
                         </p>
                         {addr.isDefault && <span className={`text-xs font-bold ${selectedAddressId === addr._id ? 'text-green-700' : 'text-green-600'}`}>Mặc định</span>}
                       </div>
@@ -252,7 +286,7 @@ const Checkout = () => {
                     </div>
                   ))}
                   <div className="border-t my-1"></div>
-                  <div onClick={() => { setSelectedAddressId('new'); setFormData({ name: '', phone: '', address: '', note: '' }); setIsAddressListOpen(false); }} className={`p-3 font-semibold rounded-lg cursor-pointer transition-colors ${selectedAddressId === 'new' ? 'bg-sky-100 text-sky-700' : 'text-sky-600 hover:bg-sky-50'}`}>
+                  <div onClick={() => { setSelectedAddressId('new'); setFormData({ name: '', phone: '', address: '', note: '', location: null }); setIsAddressListOpen(false); }} className={`p-3 font-semibold rounded-lg cursor-pointer transition-colors ${selectedAddressId === 'new' ? 'bg-sky-100 text-sky-700' : 'text-sky-600 hover:bg-sky-50'}`}>
                     + Giao đến địa chỉ khác
                   </div>
                 </div>
@@ -302,13 +336,43 @@ const Checkout = () => {
               )}
 
               <div>
-                <label className="block text-gray-600 font-semibold mb-2">Địa chỉ giao hàng chi tiết *</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-600 font-semibold text-sm">Địa chỉ giao hàng chi tiết *</label>
+                  {selectedAddressId === 'new' && (
+                    <button
+                      type="button"
+                      onClick={handleDetectLocation}
+                      disabled={isLocating || qrGenerated}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200/60 transition active:scale-95 disabled:opacity-50"
+                      title="Tự động lấy vị trí hiện tại qua GPS"
+                    >
+                      <FiNavigation className={`w-3 h-3 ${isLocating ? 'animate-spin text-sky-500' : ''}`} />
+                      <span>{isLocating ? 'Đang định vị...' : 'Vị trí hiện tại'}</span>
+                    </button>
+                  )}
+                </div>
                 <textarea required rows="3" placeholder="Số nhà, tên đường, phường/xã, quận/huyện..." 
                   value={formData.address}
                   className={`w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 transition resize-none ${selectedAddressId !== 'new' ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                   disabled={qrGenerated || selectedAddressId !== 'new'}
                 ></textarea>
+                {formData.location?.lat && formData.location?.lng && (
+                  <div className="flex items-center justify-between text-xs text-slate-500 mt-1.5 px-1">
+                    <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Tọa độ: {formData.location.lat.toFixed(4)}, {formData.location.lng.toFixed(4)}
+                    </span>
+                    <a
+                      href={getGoogleMapsUrl(formData.location.lat, formData.location.lng)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sky-500 hover:underline inline-flex items-center gap-1 font-semibold"
+                    >
+                      Xem bản đồ ↗
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div>

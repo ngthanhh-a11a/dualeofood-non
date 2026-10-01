@@ -19,7 +19,11 @@ const orderSchema = new mongoose.Schema({
         name: { type: String },
         phone: { type: String },
         address: { type: String },
-        note: { type: String }
+        note: { type: String },
+        location: {
+            lat: { type: Number, default: null },
+            lng: { type: Number, default: null }
+        }
     },
     status: { 
         type: String, 

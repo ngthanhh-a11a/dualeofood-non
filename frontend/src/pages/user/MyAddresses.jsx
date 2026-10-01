@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../../utils/axiosConfig';
 import { Toaster, toast } from 'react-hot-toast';
-import { FiPlus, FiMapPin, FiEdit, FiTrash2, FiCheckCircle } from 'react-icons/fi';
+import { FiPlus, FiMapPin, FiEdit, FiTrash2, FiCheckCircle, FiNavigation } from 'react-icons/fi';
+import { getCurrentCoordinates, reverseGeocodeOSM, getGoogleMapsUrl } from '../../utils/geolocation';
 
 // Modal component for Add/Edit Address
 const AddressModal = ({ isOpen, onClose, onSubmit, addressData, setAddressData }) => { // NOSONAR
     if (!isOpen) return null;
 
+    const [isLocating, setIsLocating] = useState(false);
     const isEditing = addressData && addressData._id;
 
     const handleInputChange = (e) => {
@@ -15,6 +17,30 @@ const AddressModal = ({ isOpen, onClose, onSubmit, addressData, setAddressData }
             ...prev,
             [name]: type === 'checkbox' ? checked : value,
         }));
+    };
+
+    const handleDetectLocation = async () => {
+        setIsLocating(true);
+        const toastId = toast.loading('Đang lấy tín hiệu GPS...');
+        try {
+            const coords = await getCurrentCoordinates();
+            toast.loading('Đang định vị địa chỉ...', { id: toastId });
+            const streetName = await reverseGeocodeOSM(coords.lat, coords.lng);
+
+            setAddressData(prev => ({
+                ...prev,
+                street: streetName || prev.street,
+                location: {
+                    lat: coords.lat,
+                    lng: coords.lng
+                }
+            }));
+            toast.success('Đã xác định vị trí thành công!', { id: toastId });
+        } catch (error) {
+            toast.error(error.message || 'Không thể lấy vị trí hiện tại.', { id: toastId });
+        } finally {
+            setIsLocating(false);
+        }
     };
 
     const handleSubmit = (e) => {
@@ -40,8 +66,44 @@ const AddressModal = ({ isOpen, onClose, onSubmit, addressData, setAddressData }
                         <input type="tel" name="phone" value={addressData.phone} onChange={handleInputChange} required pattern="[0-9]{10}" title="Số điện thoại phải có 10 chữ số" placeholder="09xxxxxxxx" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
                     </div>
                     <div>
-                        <label className="block text-gray-600 font-semibold mb-2 text-sm">Địa chỉ chi tiết *</label>
-                        <textarea name="street" value={addressData.street} onChange={handleInputChange} required rows="3" placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố" className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 resize-none"></textarea>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-gray-600 font-semibold text-sm">Địa chỉ chi tiết *</label>
+                            <button
+                                type="button"
+                                onClick={handleDetectLocation}
+                                disabled={isLocating}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-sky-600 bg-sky-50 hover:bg-sky-100 border border-sky-200/60 transition active:scale-95 disabled:opacity-60"
+                                title="Tự động lấy vị trí hiện tại qua GPS"
+                            >
+                                <FiNavigation className={`w-3 h-3 ${isLocating ? 'animate-spin text-sky-500' : ''}`} />
+                                <span>{isLocating ? 'Đang định vị...' : 'Vị trí hiện tại'}</span>
+                            </button>
+                        </div>
+                        <textarea 
+                            name="street" 
+                            value={addressData.street} 
+                            onChange={handleInputChange} 
+                            required 
+                            rows="3" 
+                            placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố" 
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 resize-none"
+                        ></textarea>
+                        {addressData.location?.lat && addressData.location?.lng && (
+                            <div className="flex items-center justify-between text-xs text-slate-500 mt-1.5 px-1">
+                                <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Tọa độ: {addressData.location.lat.toFixed(4)}, {addressData.location.lng.toFixed(4)}
+                                </span>
+                                <a
+                                    href={getGoogleMapsUrl(addressData.location.lat, addressData.location.lng)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sky-500 hover:underline inline-flex items-center gap-1 font-semibold"
+                                >
+                                    Xem bản đồ ↗
+                                </a>
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-3">
                         <input type="checkbox" id="isDefault" name="isDefault" checked={addressData.isDefault} onChange={handleInputChange} className="w-5 h-5 text-sky-500 rounded focus:ring-sky-500" />
@@ -167,7 +229,21 @@ const MyAddresses = () => {
                                         <span className="text-gray-500">|</span>
                                         <p className="text-gray-600">{addr.phone}</p>
                                     </div>
-                                    <p className="text-gray-500 text-sm">{addr.street}</p>
+                                    <p className="text-gray-500 text-sm flex items-center gap-2 flex-wrap mt-0.5">
+                                        <span>{addr.street}</span>
+                                        {addr.location?.lat && addr.location?.lng && (
+                                            <a 
+                                                href={getGoogleMapsUrl(addr.location.lat, addr.location.lng)} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60 hover:bg-emerald-100 transition" 
+                                                title="Bấm để xem tọa độ trên Google Maps"
+                                            >
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                                GPS
+                                            </a>
+                                        )}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                     {addr.isDefault ? (

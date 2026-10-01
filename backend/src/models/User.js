@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema({
         name: { type: String, required: true }, // Tên người nhận
         phone: { type: String, required: true }, // Số điện thoại liên hệ
         street: { type: String, required: true }, // Địa chỉ cụ thể
+        location: {
+          lat: { type: Number, default: null },
+          lng: { type: Number, default: null }
+        },
         isDefault: { type: Boolean, default: false } // Địa chỉ mặc định
       }
     ]

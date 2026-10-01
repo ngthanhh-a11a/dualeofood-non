@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const bannerController = require('../controllers/bannerController');
-const { verifyToken, authorizeRoles } = require('../middleware/authMiddleware');
+const { verifyToken, authorizeRoles, optionalAuth } = require('../middleware/authMiddleware');
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('../config/cloudinary');
@@ -20,16 +20,6 @@ const storage = new CloudinaryStorage({
     }
 });
 const upload = multer({ storage });
-
-// Middleware lấy user tuỳ chọn
-const optionalAuth = (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer')) {
-        verifyToken(req, res, next);
-    } else {
-        next();
-    }
-};
 
 const adminOrStaff = authorizeRoles('admin', 'staff');
 const adminOnly = authorizeRoles('admin');

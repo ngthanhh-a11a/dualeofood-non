@@ -234,6 +234,18 @@ const AdminOrders = () => {
                     <p className="font-bold text-gray-800">{order.customerInfo?.name || 'Khách vãng lai'}</p>
                     <p className="text-sm text-gray-500">{order.customerInfo?.phone || 'N/A'}</p>
                     <p className="text-xs text-gray-400 mt-1 line-clamp-1 w-40" title={order.customerInfo?.address}>{order.customerInfo?.address || 'N/A'}</p>
+                    {order.customerInfo?.location?.lat && order.customerInfo?.location?.lng && (
+                      <a 
+                        href={`https://www.google.com/maps?q=${order.customerInfo.location.lat},${order.customerInfo.location.lng}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 transition mt-1"
+                        title="Mở chỉ đường Google Maps tới vị trí khách hàng"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        🗺️ Bản đồ GPS
+                      </a>
+                    )}
                   </td>
                   <td className="p-4">
                     <div 

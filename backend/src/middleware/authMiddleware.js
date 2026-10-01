@@ -55,8 +55,37 @@ const authorizeRoles = (...allowedRoles) => {
   };
 };
 
+/**
+ * Middleware xác thực JWT Token tùy chọn.
+ * Dành cho các route công khai nhưng có thể phân cấp hiển thị nếu có user đăng nhập.
+ * Nếu có token hợp lệ -> gán req.user.
+ * Nếu không có token HOẶC token hết hạn/lỗi -> bỏ qua, không chặn request (req.user = null).
+ */
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dualeofood_secret');
+        req.user = decoded;
+        if (decoded.id && !req.user._id) {
+          req.user._id = decoded.id;
+        }
+        if (decoded._id && !req.user.id) {
+          req.user.id = decoded._id;
+        }
+      } catch (error) {
+        // Token hết hạn hoặc không hợp lệ: bỏ qua và tiếp tục như khách vãng lai
+        req.user = null;
+      }
+    }
+  }
+  next();
+};
+
 // Giữ lại isAdmin để backward-compatible với các route chưa migrate
 // isAdmin bản chất là authorizeRoles('admin')
 const isAdmin = authorizeRoles('admin');
 
-module.exports = { verifyToken, authorizeRoles, isAdmin };
+module.exports = { verifyToken, authorizeRoles, isAdmin, optionalAuth };

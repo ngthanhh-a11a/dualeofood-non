@@ -113,7 +113,7 @@ const updateProfile = asyncHandler(async (req, res) => {
 
 // [POST] /api/users/addresses - Thêm địa chỉ mới
 const addAddress = asyncHandler(async (req, res) => {
-    const { name, phone, street, isDefault, label } = req.body;
+    const { name, phone, street, isDefault, label, location } = req.body;
     if (!name || !phone || !street) {
         return res.status(400).json({ message: 'Vui lòng điền đầy đủ thông tin địa chỉ.' });
     }
@@ -131,7 +131,7 @@ const addAddress = asyncHandler(async (req, res) => {
         }
 
         // Thêm địa chỉ mới vào mảng
-        user.addresses.push({ name, phone, street, isDefault, label });
+        user.addresses.push({ name, phone, street, isDefault, label, location });
         await user.save();
 
         res.status(201).json(user.addresses);
@@ -142,7 +142,7 @@ const addAddress = asyncHandler(async (req, res) => {
 
 // [PUT] /api/users/addresses/:id - Cập nhật địa chỉ
 const updateAddress = asyncHandler(async (req, res) => {
-    const { name, phone, street, isDefault, label } = req.body;
+    const { name, phone, street, isDefault, label, location } = req.body;
     const user = await User.findById(req.user.id);
 
     // Đảm bảo mảng addresses luôn tồn tại
@@ -158,7 +158,14 @@ const updateAddress = asyncHandler(async (req, res) => {
         user.addresses.forEach(addr => addr.isDefault = false);
     }
 
-    address.set({ name, phone, street, isDefault, label });
+    address.set({ 
+        name, 
+        phone, 
+        street, 
+        isDefault, 
+        label,
+        ...(location !== undefined ? { location } : {})
+    });
     await user.save();
     res.json(user.addresses);
 });

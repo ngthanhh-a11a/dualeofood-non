@@ -16,6 +16,21 @@ instance.interceptors.request.use((config) => {
     return config;
 });
 
+// Tự động dọn dẹp Token hết hạn khi Server trả về mã lỗi 401
+instance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response && error.response.status === 401) {
+            const token = localStorage.getItem('token');
+            if (token) {
+                localStorage.removeItem('token');
+                localStorage.removeItem('userInfo');
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 // Hàm tiện ích để lấy đường dẫn ảnh chính xác & tự động nâng cấp độ sắc nét cao nhất
 export const getImageUrl = (imagePath) => {
     if (!imagePath) return '';
