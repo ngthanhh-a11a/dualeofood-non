@@ -1,156 +1,225 @@
-# HƯỚNG DẪN CHI TIẾT NỘI DUNG BÁO CÁO & TRIỂN KHAI HỆ THỐNG (CĐTN2)
+# HƯỚNG DẪN CHI TIẾT NỘI DUNG BÁO CÁO & TRIỂN KHAI HỆ THỐNG TRÊN LINUX (WSL2 / UBUNTU) - CĐTN2
 
-Tài liệu này giải thích chi tiết 5 yêu cầu của Giảng viên hướng dẫn về khía cạnh **Quản trị hệ thống & Triển khai trên Linux**, giúp tất cả thành viên trong nhóm hiểu rõ bản chất kỹ thuật và biết chính xác cần làm gì, chụp ảnh gì để đưa vào cuốn báo cáo cuối kỳ.
-
----
-
-## 1. VÌ SAO KHÔNG THỂ DÙNG NGUYÊN VERCEL / RENDER?
-* **Môn học CĐTN2** có phần lý thuyết và thực hành về **Hệ điều hành Linux & Quản trị hệ thống**.
-* Việc deploy tự động bằng cách bấm nút trên Vercel/Render (PaaS) tuy chạy được web nhưng **không thể hiện được kỹ năng quản trị Linux** (cấu hình Web server, Reverse proxy, Tường lửa, Quản lý tiến trình, Tự động hóa sao lưu bằng Cronjob).
-* **Mục tiêu:** Cần triển khai hệ thống web trên một môi trường **Linux (Ubuntu Server)** — có thể dùng máy ảo cục bộ (VMware, VirtualBox, WSL2) hoặc VPS thật.
+Tài liệu này chuẩn hóa toàn bộ quy trình triển khai thực tế trên môi trường **Linux (WSL2 Ubuntu)** và hướng dẫn chi tiết 5 mục báo cáo cho môn Chuyên đề tốt nghiệp 2 (CĐTN2), phục vụ việc lấy số liệu và ảnh chụp minh chứng cho cuốn báo cáo.
 
 ---
 
-## 2. MÔ HÌNH HỆ THỐNG TRÊN LINUX (UBUNTU)
+## 1. VÌ SAO PHẢI TRIỂN KHAI TRÊN LINUX (THAY VÌ CHỈ DÙNG VERCEL / RENDER)?
+* Môn học CĐTN2 yêu cầu sinh viên nắm vững kỹ năng **Quản trị hệ thống (System Administration)** trên nền tảng Linux.
+* Việc deploy tự động bằng giao diện bấm nút trên Vercel/Render (PaaS) không thể hiện được các kỹ năng:
+  * Cấu hình Web Server và Reverse Proxy (Nginx).
+  * Quản trị tiến trình nền và phân bổ tài nguyên CPU/RAM (PM2).
+  * Quản lý an ninh mạng và tường lửa (UFW).
+  * Tự động hóa tác vụ định kỳ bằng Shell Script và Cronjob (Sao lưu và phục hồi thảm họa).
+* **Môi trường thực thi trong dự án:** Sử dụng **WSL2 (Ubuntu)** ngay trên máy Windows, cho phép chạy nhân Linux thật, thao tác hoàn toàn qua dòng lệnh (CLI).
+
+---
+
+## 2. KIẾN TRÚC HỆ THỐNG TRIỂN KHAI
 
 ```
 [ Trình duyệt / Client ]
            │
-           │ (Cổng 80 - HTTP)
+           │ (HTTP - Port 80)
            ▼
 ┌────────────────────────────────────────────────────────┐
-│ MÁY CHỦ LINUX (UBUNTU)                                 │
+│ MÁY CHỦ LINUX (WSL2 UBUNTU)                            │
 │                                                        │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │ NGINX (Web Server & Reverse Proxy)               │  │
-│  │  - Phục vụ Frontend tĩnh: /var/www/html/dist     │  │
-│  │  - Chuyển tiếp /api/* -> http://localhost:5000   │  │
+│  │  - Phục vụ Frontend tĩnh: frontend/dist          │  │
+│  │  - Chuyển tiếp /api/* -> 127.0.0.1:5000          │  │
+│  │  - Chuyển tiếp /socket.io/* -> 127.0.0.1:5000    │  │
 │  └──────────────────────┬───────────────────────────┘  │
 │                         │                              │
 │                         ▼                              │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │ BACKEND NODE.JS (Quản lý bởi PM2)                │  │
 │  │  - Chạy ngầm tại cổng nội bộ 5000                │  │
-│  │  - Tự động restart khi crash / reboot            │  │
+│  │  - Cluster mode, tự khởi động lại khi crash      │  │
 │  └──────────────────────┬───────────────────────────┘  │
 │                         │                              │
 │                         ▼                              │
 │  ┌──────────────────────────────────────────────────┐  │
-│  │ DATABASE MONGODB (Local hoặc MongoDB Atlas)      │  │
+│  │ DATABASE MONGODB (MongoDB Atlas / Local)         │  │
 │  └──────────────────────────────────────────────────┘  │
 │                         ▲                              │
 │                         │                              │
 │  ┌──────────────────────┴───────────────────────────┐  │
 │  │ CRONJOB + BASH SCRIPT (Sao lưu tự động)          │  │
 │  │  - Tự động chạy mongodump lúc 02:00 sáng         │  │
-│  │  - Nén file backup lưu vào thư mục an toàn       │  │
+│  │  - Nén file tar.gz & xóa bản cũ sau 7 ngày       │  │
 │  └──────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. CHI TIẾT 5 MỤC YÊU CẦU CỦA BÁO CÁO
+## 3. CÁC FILE CẤU HÌNH & SCRIPT TỰ ĐỘNG HÓA TRONG THƯ MỤC `deployment/`
 
-### MỤC 1: PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG
-* **Mục tiêu:** Trình bày cấu trúc và kiến trúc phần mềm trước khi đưa vào cài đặt.
-* **Nội dung cần viết vào báo cáo:**
-  1. **Sơ đồ kiến trúc tổng thể:** Mô hình 3 lớp (Client Layer $\rightarrow$ Application Layer $\rightarrow$ Database Layer).
-  2. **Thiết kế Cơ sở dữ liệu (ERD / Schema):** Danh sách các Collection trong MongoDB (`users`, `products`, `orders`, `categories`,...), giải thích các trường dữ liệu quan trọng và quan hệ giữa chúng.
-  3. **Sơ đồ luồng xử lý (Data Flow / Sequence Diagram):**
-     * Luồng Đăng nhập / Xác thực (sử dụng JWT).
-     * Luồng Đặt hàng và xử lý đơn hàng.
+Dự án đã được tích hợp sẵn bộ script chuẩn hóa tại thư mục `deployment/`:
 
----
-
-### MỤC 2: CÀI ĐẶT VÀ CẤU HÌNH MÔI TRƯỜNG
-* **Mục tiêu:** Chứng minh các bước chuẩn bị hạ tầng từ đầu trên hệ điều hành Linux.
-* **Nội dung cần viết vào báo cáo:**
-  1. **Thông tin môi trường:**
-     * Hệ điều hành: Ubuntu 22.04 LTS / 24.04 LTS.
-     * Phiên bản phần mềm: Node.js (v20+), Nginx (v1.18+), Git, PM2.
-  2. **Các lệnh cài đặt môi trường đã thực thi:**
-     * Cập nhật hệ thống: `sudo apt update && sudo apt upgrade -y`.
-     * Cài đặt Nginx: `sudo apt install nginx -y`.
-     * Cài đặt Node.js & npm/pnpm.
-     * Cài đặt PM2 toàn cục: `sudo npm install -g pm2`.
-  3. **Cấu hình bảo mật tường lửa (UFW):**
-     * Kích hoạt tường lửa và chỉ mở các cổng cho phép: Cổng 22 (SSH), Cổng 80 (HTTP), Cổng 443 (HTTPS).
-  4. **Cấu hình biến môi trường (`.env`):**
-     * Liệt kê bảng giải thích các biến: `PORT`, `MONGO_URI`, `JWT_SECRET`,... (che mờ chuỗi mật khẩu trong báo cáo).
+1. **`deployment/setup-wsl.sh`**: Script tự động cài đặt Node.js LTS (v20), Nginx, PM2, pnpm, MongoDB Database Tools và áp dụng cấu hình hệ thống chỉ bằng 1 câu lệnh.
+2. **`deployment/nginx.conf`**: Cấu hình Virtual Host của Nginx:
+   * Phục vụ Frontend React/Vite SPA (`try_files $uri $uri/ /index.html;`).
+   * Reverse Proxy định tuyến `/api/` về Backend chạy cổng `5000`.
+   * Hỗ trợ WebSocket (`/socket.io/`) và nén Gzip tăng tốc độ tải trang.
+3. **`deployment/ecosystem.config.js`**: Cấu hình tiến trình PM2 cho Backend chạy chế độ `cluster`, tự khởi động lại khi RAM vượt quá 500MB hoặc khi tiến trình gặp lỗi.
+4. **`deployment/backup.sh`**: Script tự động xuất CSDL bằng `mongodump`, nén thành file `backup_YYYYMMDD_HHMMSS.tar.gz` và tự dọn dẹp các bản sao lưu cũ quá 7 ngày.
+5. **`deployment/restore.sh`**: Script phục hồi toàn diện cơ sở dữ liệu từ file sao lưu nén bằng `mongorestore`.
 
 ---
 
-### MỤC 3: TRIỂN KHAI WEBSITE (DEPLOYMENT)
-* **Mục tiêu:** Trình bày quy trình đưa mã nguồn lên máy chủ và kích hoạt ứng dụng chạy thực tế.
-* **Nội dung cần viết vào báo cáo:**
-  1. **Triển khai Backend:**
-     * Kéo mã nguồn về thư mục làm việc (vd: `/var/www/backend`).
-     * Cài đặt dependencies: `pnpm install --prod`.
-     * Cấu hình quản lý tiến trình bằng **PM2**:
-       * Lệnh khởi chạy: `pm2 start index.js --name "food-backend"`.
-       * Lưu trạng thái tự khởi động cùng hệ điều hành: `pm2 startup` và `pm2 save`.
-  2. **Triển khai Frontend:**
-     * Build mã nguồn thành file tĩnh: `pnpm run build` (tạo thư mục `dist`).
-     * Đưa thư mục build vào thư mục phục vụ web của Linux: `/var/www/frontend`.
-  3. **Cấu hình Nginx (Web Server & Reverse Proxy):**
-     * Tạo file cấu hình tại `/etc/nginx/sites-available/food-app`.
-     * **Cấu hình phục vụ Frontend (SPA):** Trỏ root về `/var/www/frontend`, cấu hình `try_files $uri $uri/ /index.html;` để tránh lỗi 404 khi người dùng tải lại trang.
-     * **Cấu hình Reverse Proxy cho Backend:** Mọi request có tiền tố `/api/` sẽ được Nginx đẩy ngầm về `http://127.0.0.1:5000`.
-     * Kích hoạt site (`ln -s`) và kiểm tra cú pháp (`nginx -t`), reload Nginx (`systemctl reload nginx`).
+## 4. QUY TRÌNH THỰC THI THỰC TẾ TRÊN WSL2 (TỪNG BƯỚC)
+
+### Bước 1: Khởi động môi trường Linux (WSL2 Ubuntu)
+Mở PowerShell hoặc Windows Terminal:
+```bash
+wsl -d Ubuntu
+```
+
+### Bước 2: Di chuyển vào thư mục dự án
+Trong terminal Ubuntu:
+```bash
+cd /mnt/c/Users/ADMIN/Desktop/test-bandoan
+```
+
+### Bước 3: Chạy script cài đặt môi trường tự động
+```bash
+bash deployment/setup-wsl.sh
+```
+*Script sẽ tự động cài đặt các công cụ, liên kết file cấu hình Nginx và khởi chạy service.*  
+> **[ẢNH MINH CHỨNG 1 & 2]**: Chụp terminal hiển thị phiên bản `node -v`, `nginx -v`, `pm2 -v` và dòng chữ `CÀI ĐẶT HOÀN TẤT!`.
+
+### Bước 4: Triển khai Frontend & Backend
+1. **Build mã nguồn Frontend:**
+   ```bash
+   cd frontend
+   pnpm install
+   pnpm run build
+   cd ..
+   ```
+2. **Khởi chạy Backend với PM2:**
+   ```bash
+   pm2 start deployment/ecosystem.config.js
+   pm2 save
+   ```
+> **[ẢNH MINH CHỨNG 3 & 4]**: Chụp màn hình bảng trạng thái `pm2 status` (trạng thái `online`) và giao diện giám sát tài nguyên `pm2 monit`.
+
+### Bước 5: Kiểm tra hoạt động hệ thống
+Mở trình duyệt trên Windows:
+* Truy cập `http://localhost`: Giao diện Web hiển thị thông qua Nginx.
+* Truy cập `http://localhost/api/products`: Trả về dữ liệu JSON của API (chứng minh Reverse Proxy hoạt động chính xác).
+> **[ẢNH MINH CHỨNG 5 & 6]**: Chụp màn hình trình duyệt hiển thị trang web tại `http://localhost` và kết quả gọi API.
+
+### Bước 6: Kiểm tra quản trị và giám sát hệ thống
+1. **Kiểm tra trạng thái Nginx và đọc Log:**
+   ```bash
+   sudo systemctl status nginx
+   tail -n 20 /var/log/nginx/access.log
+   ```
+2. **Xem mức tiêu thụ tài nguyên phần cứng Linux:**
+   ```bash
+   htop
+   ```
+> **[ẢNH MINH CHỨNG 7 & 8]**: Chụp file log Nginx ghi nhận request và màn hình lệnh `htop`.
+
+### Bước 7: Thực hiện sao lưu & Lập lịch tự động (Cronjob)
+1. **Chạy thử nghiệm sao lưu thủ công:**
+   ```bash
+   bash deployment/backup.sh
+   ls -lh backups/
+   ```
+2. **Cấu hình lập lịch sao lưu định kỳ:**
+   ```bash
+   crontab -e
+   ```
+   Thêm dòng sau vào cuối file để tự động sao lưu vào lúc 02:00 sáng mỗi ngày:
+   ```text
+   0 2 * * * /bin/bash /mnt/c/Users/ADMIN/Desktop/test-bandoan/deployment/backup.sh >> /mnt/c/Users/ADMIN/Desktop/test-bandoan/backups/backup.log 2>&1
+   ```
+   Kiểm tra lại lịch trình đã lưu:
+   ```bash
+   crontab -l
+   ```
+> **[ẢNH MINH CHỨNG 9 & 10]**: Chụp danh sách file nén trong thư mục `backups/` và nội dung lệnh `crontab -l`.
+
+### Bước 8: Thử nghiệm kịch bản phục hồi dữ liệu (Disaster Recovery)
+Khi cần khôi phục lại dữ liệu từ một bản backup:
+```bash
+bash deployment/restore.sh /mnt/c/Users/ADMIN/Desktop/test-bandoan/backups/<TEN_FILE_BACKUP>.tar.gz
+```
+> **[ẢNH MINH CHỨNG 11]**: Chụp màn hình lệnh `restore.sh` chạy hoàn tất với thông báo `done restoring`.
 
 ---
 
-### MỤC 4: KIỂM THỬ VÀ QUẢN TRỊ HỆ THỐNG
-* **Mục tiêu:** Đánh giá độ ổn định của hệ thống và các công cụ dùng để theo dõi, vận hành.
-* **Nội dung cần viết vào báo cáo:**
-  1. **Kiểm thử hệ thống (System Testing):**
-     * **Kiểm thử chức năng (Functional Testing):** Bảng Test Case các luồng chính (Đăng ký, Đăng nhập, Thêm món vào giỏ, Đặt hàng, Quản lý đơn hàng của Admin). Kết quả: Đạt (Pass) / Không đạt (Fail).
-     * **Kiểm thử API:** Dùng Postman hoặc lệnh `curl -I http://localhost/api/...` để kiểm tra mã trạng thái trả về (200 OK, 401 Unauthorized, 404 Not Found).
-     * **Kiểm thử hiệu năng:** Đánh giá điểm số bằng Google Lighthouse (Performance, PWA, SEO).
-  2. **Quản trị hệ thống (System Administration):**
-     * **Giám sát tiến trình:** Chụp màn hình bảng trạng thái `pm2 status`, `pm2 monit` (hiển thị CPU, RAM của backend).
-     * **Giám sát tài nguyên máy chủ:** Chụp màn hình lệnh `htop` hoặc `top` trên Linux.
-     * **Quản trị Logs:** Cách kiểm tra log truy cập và log lỗi khi hệ thống gặp sự cố:
-       * Log Nginx: `tail -f /var/log/nginx/access.log` và `/var/log/nginx/error.log`.
-       * Log Backend: `pm2 logs food-backend --lines 50`.
+## 5. DÀN Ý CHI TIẾT 5 MỤC TRONG CUỐN BÁO CÁO CUỐI KỲ
+
+### CHƯƠNG / MỤC 1: PHÂN TÍCH VÀ THIẾT KẾ HỆ THỐNG
+1. **Kiến trúc tổng thể hệ thống:** Trình bày mô hình 3 lớp (Client Layer $\rightarrow$ Application Layer $\rightarrow$ Database Layer). Đưa sơ đồ kiến trúc tại Mục 2 vào báo cáo.
+2. **Thiết kế Cơ sở dữ liệu (Database Schema):** Danh sách các collection chính (`users`, `products`, `orders`, `categories`,...), kiểu dữ liệu từng trường và quan hệ giữa các collection.
+3. **Sơ đồ luồng dữ liệu (Data Flow / Sequence Diagram):**
+   * Quy trình xác thực phân quyền qua JWT Token (User, Staff, Admin).
+   * Quy trình tạo đơn hàng, trừ tồn kho và cập nhật trạng thái đơn hàng thời gian thực qua Socket.IO.
+
+### CHƯƠNG / MỤC 2: CÀI ĐẶT VÀ CẤU HÌNH MÔI TRƯỜNG
+1. **Hạ tầng máy chủ:** Trình bày về hệ điều hành Linux (Ubuntu 22.04 LTS chạy trên nền tảng WSL2/Virtualization).
+2. **Các gói phần mềm nền tảng:**
+   * Node.js v20 (LTS) & Trình quản lý gói pnpm.
+   * Nginx v1.18+ (High-Performance Web Server).
+   * PM2 (Node.js Production Process Manager).
+   * MongoDB Database Tools (`mongodump`, `mongorestore`).
+3. **Cấu hình biến môi trường (`.env`):** Lập bảng giải thích các tham số cấu hình hệ thống: `PORT`, `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL`.
+4. **Cấu hình an ninh & Tường lửa:** Thiết lập phân quyền truy cập cổng mạng qua UFW (`ufw allow 80`, `ufw allow 443`).
+
+### CHƯƠNG / MỤC 3: TRIỂN KHAI WEBSITE
+1. **Triển khai ứng dụng Frontend:**
+   * Tối ưu hóa đóng gói mã nguồn tĩnh bằng Vite (`pnpm run build`).
+   * Phục vụ ứng dụng đơn trang (SPA) qua Nginx Web Server.
+2. **Triển khai ứng dụng Backend:**
+   * Cấu hình tiến trình bằng PM2 Cluster Mode giúp tận dụng đa nhân CPU.
+   * Cơ chế tự phục hồi (Auto-restart) khi tiến trình crash hoặc vượt giới hạn bộ nhớ.
+3. **Cấu hình Nginx Reverse Proxy:**
+   * Phân tích nội dung file cấu hình `/etc/nginx/sites-available/food-app`.
+   * Định tuyến request: Phục vụ Frontend tại `/` và ủy quyền các request `/api/`, `/socket.io/` về Backend cổng `5000`.
+
+### CHƯƠNG / MỤC 4: KIỂM THỬ VÀ QUẢN TRỊ HỆ THỐNG
+1. **Kiểm thử hệ thống (System Testing):**
+   * **Kiểm thử chức năng:** Bảng Test Case các chức năng cốt lõi (Đăng ký/Đăng nhập, Quản lý giỏ hàng, Thanh toán, Quản lý đơn hàng).
+   * **Kiểm thử API:** Kiểm tra các HTTP Status Code trả về (200, 201, 400, 401, 403, 500) qua Postman.
+   * **Đánh giá hiệu năng:** Đo lường chỉ số Google Lighthouse (Performance, PWA, SEO).
+2. **Quản trị và giám sát hệ thống:**
+   * Giám sát tiến trình thời gian thực qua `pm2 status` và `pm2 monit`.
+   * Giám sát tài nguyên máy chủ (CPU, RAM, Load Average) bằng `htop`.
+   * Phân tích và quản lý nhật ký hệ thống qua file log Nginx (`access.log`, `error.log`).
+
+### CHƯƠNG / MỤC 5: SAO LƯU VÀ PHỤC HỒI HỆ THỐNG
+1. **Chiến lược an toàn dữ liệu:**
+   * Kế hoạch sao lưu định kỳ tự động hàng ngày lúc 02:00 sáng.
+   * Chính sách lưu trữ và tự động dọn dẹp các bản sao lưu quá 7 ngày nhằm tối ưu dung lượng đĩa cứng.
+2. **Tự động hóa sao lưu:**
+   * Trình bày thuật toán và mã nguồn script `backup.sh`.
+   * Thiết lập tác vụ định kỳ tự động thông qua Linux Daemon Cronjob (`crontab`).
+3. **Quy trình phục hồi sau thảm họa (Disaster Recovery):**
+   * Kịch bản xử lý sự cố khi mất mát dữ liệu hoặc hỏng CSDL.
+   * Các bước trích xuất và nạp lại dữ liệu bằng script `restore.sh`.
 
 ---
 
-### MỤC 5: SAO LƯU VÀ PHỤC HỒI HỆ THỐNG (BACKUP & RECOVERY)
-* **Mục tiêu:** Chứng minh có phương án đảm bảo an toàn dữ liệu khi có sự cố thảm họa.
-* **Nội dung cần viết vào báo cáo:**
-  1. **Chiến lược sao lưu (Backup Strategy):**
-     * Tự động sao lưu cơ sở dữ liệu MongoDB định kỳ mỗi ngày 1 lần vào lúc 02:00 sáng (thời điểm ít người truy cập).
-     * Bản sao lưu được lưu trữ dưới dạng nén `.tar.gz` kèm mốc thời gian (Timestamp).
-  2. **Viết Script tự động hóa (`backup.sh`):**
-     * Dùng lệnh `mongodump` để trích xuất dữ liệu CSDL.
-     * Nén thư mục dữ liệu thành file dạng `backup_YYYY-MM-DD.tar.gz`.
-     * Thiết lập tự động xóa các bản sao lưu cũ quá 7 ngày để tiết kiệm dung lượng ổ cứng.
-  3. **Lập lịch tự động bằng Cronjob:**
-     * Mở cấu hình cron: `crontab -e`.
-     * Thêm tác vụ: `0 2 * * * /bin/bash /var/scripts/backup.sh`.
-  4. **Quy trình phục hồi dữ liệu (Disaster Recovery):**
-     * Giả lập tình huống: Dữ liệu bị xóa nhầm hoặc database bị lỗi.
-     * Giải nén file backup gần nhất: `tar -xvf backup_YYYY-MM-DD.tar.gz`.
-     * Chạy lệnh phục hồi: `mongorestore --uri="<MONGO_URI>" ./dump/`.
-     * Kiểm tra lại dữ liệu trên giao diện web.
+## 6. CHECKLIST ẢNH CHỤP MINH CHỨNG CẦN LỒNG VÀO BÁO CÁO
 
----
-
-## 4. DANH SÁCH ẢNH CHỤP MINH CHỨNG CẦN CÓ TRONG BÁO CÁO
-
-| STT | Tên mục | Nội dung ảnh chụp cần đưa vào báo cáo |
-| :--- | :--- | :--- |
-| 1 | Môi trường | Terminal lệnh `node -v`, `npm -v`, `nginx -v`, `git --version` trên Ubuntu. |
-| 2 | Môi trường | Trạng thái tường lửa `sudo ufw status verbose` (hiển thị cổng 22, 80, 443). |
-| 3 | Triển khai | File cấu hình Nginx trong `/etc/nginx/sites-available/`. |
-| 4 | Triển khai | Kết quả kiểm tra file cấu hình Nginx: `sudo nginx -t`. |
-| 5 | Triển khai | Bảng trạng thái `pm2 status` và lệnh `pm2 startup`. |
-| 6 | Quản trị | Màn hình `pm2 monit` hiển thị thời gian thực mức tiêu thụ tài nguyên Backend. |
-| 7 | Quản trị | Màn hình `htop` hiển thị tổng thể RAM/CPU của hệ điều hành Ubuntu. |
-| 8 | Quản trị | File log Nginx (`access.log`) ghi nhận request từ Client. |
-| 9 | Kiểm thử | Kết quả chạy Test API trên Postman hoặc Swagger. |
-| 10 | Sao lưu | Nội dung file script `backup.sh` và bảng cấu hình `crontab -l`. |
-| 11 | Sao lưu | Thư mục chứa các file backup `.tar.gz` đã được sinh ra. |
-| 12 | Phục hồi | Terminal chạy lệnh `mongorestore` thành công kèm thông báo restored. |
+| STT | Mục báo cáo | Lệnh thực thi / Màn hình chụp | Ý nghĩa kỹ thuật |
+| :--- | :--- | :--- | :--- |
+| 1 | Mục 2 | `node -v && nginx -v && pm2 -v` | Chứng minh các phần mềm đã cài đặt trên Linux |
+| 2 | Mục 2 | `sudo ufw status` | Trạng thái tường lửa và các cổng được mở |
+| 3 | Mục 3 | `cat /etc/nginx/sites-available/food-app` | File cấu hình Nginx Reverse Proxy |
+| 4 | Mục 3 | `sudo nginx -t` | Cú pháp cấu hình Nginx hợp lệ |
+| 5 | Mục 3 | `pm2 status` | Backend đang chạy ổn định ở chế độ cluster |
+| 6 | Mục 3 | Trình duyệt: `http://localhost` | Frontend chạy thực tế qua Nginx |
+| 7 | Mục 4 | Postman / `curl -I http://localhost/api/products` | Kiểm thử endpoint API qua Nginx Reverse Proxy |
+| 8 | Mục 4 | `pm2 monit` | Giám sát CPU/RAM của backend theo thời gian thực |
+| 9 | Mục 4 | `htop` | Giám sát toàn bộ tài nguyên của hệ điều hành Linux |
+| 10 | Mục 4 | `tail -n 20 /var/log/nginx/access.log` | Nhật ký truy cập của người dùng trên Web Server |
+| 11 | Mục 5 | `bash deployment/backup.sh` & `ls -lh backups/` | Thực thi sao lưu CSDL thành công ra file `.tar.gz` |
+| 12 | Mục 5 | `crontab -l` | Lập lịch tự động sao lưu định kỳ trên Linux |
+| 13 | Mục 5 | `bash deployment/restore.sh <file>` | Phục hồi thành công dữ liệu CSDL từ bản sao lưu |
