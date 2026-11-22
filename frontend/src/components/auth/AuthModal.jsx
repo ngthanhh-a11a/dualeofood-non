@@ -797,17 +797,19 @@ const AuthModal = () => {
                 <div className="relative bg-white/80 px-4 text-xs font-bold text-gray-500 tracking-wider">HOẶC</div>
               </div>
               
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={() => {
-                  toast.error('Đăng nhập Google thất bại');
-                }}
-                theme="outline"
-                size="large"
-                shape="pill"
-                text="continue_with"
-                width="100%"
-              />
+              <div className="flex justify-center w-full">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => {
+                    toast.error('Đăng nhập Google thất bại');
+                  }}
+                  theme="outline"
+                  size="large"
+                  shape="pill"
+                  text="continue_with"
+                  width="360"
+                />
+              </div>
             </div>
 
           </form>
