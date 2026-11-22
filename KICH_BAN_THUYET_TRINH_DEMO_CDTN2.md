@@ -4,14 +4,38 @@
 
 ---
 
-## 1. CHUẨN BỊ TRƯỚC KHI BẮT ĐẦU BUỔI BẢO VỆ
+## 1. CÁC LỆNH KHỞI ĐỘNG HỆ THỐNG TRƯỚC KHI THUYẾT TRÌNH (PRE-FLIGHT SETUP)
 
-1. **Giao diện 1 (Trình duyệt):** Mở sẵn 2 tab:
+Trước khi bước lên bục bảo vệ hoặc bắt đầu trình chiếu màn hình (khoảng 3–5 phút), hãy mở **PowerShell** hoặc **Windows Terminal** và thực hiện các bước sau để đảm bảo mọi dịch vụ đều sẵn sàng:
+
+### Bước 1: Khởi động toàn bộ dịch vụ (Nginx & PM2 Backend)
+* **Cách nhanh (chạy 1 dòng lệnh duy nhất trên PowerShell):**
+  ```powershell
+  wsl -d Ubuntu -e bash -c "sudo systemctl start nginx; pm2 resurrect || pm2 start /mnt/c/Users/ADMIN/Desktop/test-bandoan/deployment/ecosystem.config.js"
+  ```
+* **Hoặc vào trực tiếp terminal Ubuntu (`wsl -d Ubuntu`):**
+  ```bash
+  sudo systemctl start nginx
+  pm2 start /mnt/c/Users/ADMIN/Desktop/test-bandoan/deployment/ecosystem.config.js
+  ```
+
+### Bước 2: Kiểm tra nhanh trước giờ G (Pre-check)
+Gõ lệnh sau trên terminal để chắc chắn Nginx và Backend đã thông nhau:
+```bash
+curl -I http://localhost && curl -s -o /dev/null -w "API Status: %{http_code}\n" http://localhost/api/products
+```
+* **Kết quả hợp lệ:** Trả về `HTTP/1.1 200 OK` và `API Status: 200`.
+
+### Bước 3: Chuẩn bị sẵn các cửa sổ trình chiếu
+1. **Trình duyệt (Chrome / Edge):** Mở sẵn 2 tab:
    * Tab 1: `http://localhost` (Giao diện người dùng Web Dưa Leo Food).
    * Tab 2: `http://localhost/api/products` (Kiểm tra trả dữ liệu API).
-2. **Giao diện 2 (Terminal Linux / Windows Terminal):** Bật sẵn cửa sổ Ubuntu WSL2 chia làm 2 ô (Split screen nếu dùng Windows Terminal):
-   * Ô 1: Sẵn sàng gõ lệnh quản trị (`pm2`, `nginx`, `curl`).
-   * Ô 2: Sẵn sàng xem log (`tail -f /var/log/nginx/access.log` hoặc `pm2 monit`).
+2. **Terminal Linux (Ubuntu WSL2):** Chia làm 2 ô (Split screen bằng phím tắt `Alt + Shift + D` trên Windows Terminal):
+   * Ô 1: Sẵn sàng gõ lệnh demo (`pm2 status`, `curl`, `backup.sh`).
+   * Ô 2: Mở sẵn xem log truy cập thời gian thực:
+     ```bash
+     tail -f /var/log/nginx/access.log
+     ```
 
 ---
 
