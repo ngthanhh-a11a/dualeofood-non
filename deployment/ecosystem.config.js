@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'food-backend',
-      script: './src/index.js',
+      script: './server.js',
       cwd: '/mnt/c/Users/ADMIN/Desktop/test-bandoan/backend',
       instances: 'max',
       exec_mode: 'cluster',
