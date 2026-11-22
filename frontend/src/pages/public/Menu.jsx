@@ -5,6 +5,7 @@ import { addToCart } from '../../redux/cartSlice';
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import StarRating from '../../components/common/StarRating';
 import ReviewModal from '../../components/features/ReviewModal';
+import ProductModal from '../../components/features/ProductModal';
 import toast from 'react-hot-toast';
 import { useAddToCartAnimation } from '../../hooks/useAddToCartAnimation';
 import { FiSearch, FiChevronDown, FiShoppingBag } from 'react-icons/fi';
@@ -191,14 +192,35 @@ const Menu = () => {
     window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
+  // State mở modal tùy biến món (Size & Topping)
+  const [selectedProductForModal, setSelectedProductForModal] = useState(null);
+
   const handleAddToCart = (product, event) => {
+    const hasOptions = (Array.isArray(product.sizes) && product.sizes.length > 0) || 
+                       (Array.isArray(product.toppings) && product.toppings.length > 0);
+    
+    if (hasOptions) {
+      // Mở modal để khách chọn size & topping
+      setSelectedProductForModal(product);
+      return;
+    }
+
+    // Món thường không có tùy biến: thêm trực tiếp vào giỏ
     dispatch(addToCart({
       id: product._id,
+      productId: product._id,
       name: product.name,
       price: product.price,
       image: product.image,
+      quantity: 1
     }));
     flyToCart(event);
+  };
+
+  const handleAddFromModal = (itemPayload, event) => {
+    dispatch(addToCart(itemPayload));
+    flyToCart(event);
+    setSelectedProductForModal(null);
   };
 
   const handleReviewSubmitted = () => {
@@ -423,6 +445,16 @@ const Menu = () => {
             setProductToReview(null);
           }}
           onReviewSubmitted={handleReviewSubmitted}
+        />
+      )}
+
+      {/* Product Customizer Modal (Size & Topping) */}
+      {selectedProductForModal && (
+        <ProductModal
+          product={selectedProductForModal}
+          isOpen={!!selectedProductForModal}
+          onClose={() => setSelectedProductForModal(null)}
+          onAddToCart={handleAddFromModal}
         />
       )}
     </div>

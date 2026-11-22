@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import toast from 'react-hot-toast';
-import { FaMapPin } from 'react-icons/fa';
+import { FaMapPin, FaPlus, FaTrash } from 'react-icons/fa';
 
 const Admin = () => {
   const [products, setProducts] = useState([]);
@@ -19,6 +19,8 @@ const Admin = () => {
     description: '',
     category: '', // Sẽ được cập nhật khi danh mục được tải
   });
+  const [sizes, setSizes] = useState([]); // Mảng kích cỡ [{ name: '', priceOffset: 0 }]
+  const [toppings, setToppings] = useState([]); // Mảng topping [{ name: '', price: 0 }]
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null); // State để xem trước ảnh
   const formRef = useRef(null); // Ref để cuộn tới form
@@ -68,6 +70,36 @@ const Admin = () => {
     }
   };
 
+  // Các hàm quản lý Kích cỡ (Sizes)
+  const handleAddSize = () => {
+    setSizes(prev => [...prev, { name: '', priceOffset: 0 }]);
+  };
+  const handleRemoveSize = (index) => {
+    setSizes(prev => prev.filter((_, i) => i !== index));
+  };
+  const handleSizeChange = (index, field, value) => {
+    setSizes(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  // Các hàm quản lý Topping
+  const handleAddTopping = () => {
+    setToppings(prev => [...prev, { name: '', price: 0 }]);
+  };
+  const handleRemoveTopping = (index) => {
+    setToppings(prev => prev.filter((_, i) => i !== index));
+  };
+  const handleToppingChange = (index, field, value) => {
+    setToppings(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
   // Xử lý submit thêm món ăn
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,6 +110,17 @@ const Admin = () => {
     submitData.append('price', formData.price);
     submitData.append('description', formData.description);
     submitData.append('category', formData.category);
+
+    // Gửi kèm Sizes và Toppings dạng JSON
+    const cleanSizes = sizes
+      .filter(s => s.name && s.name.trim())
+      .map(s => ({ name: s.name.trim(), priceOffset: Number(s.priceOffset) || 0 }));
+    const cleanToppings = toppings
+      .filter(t => t.name && t.name.trim())
+      .map(t => ({ name: t.name.trim(), price: Number(t.price) || 0 }));
+    submitData.append('sizes', JSON.stringify(cleanSizes));
+    submitData.append('toppings', JSON.stringify(cleanToppings));
+
     // Chỉ thêm ảnh vào FormData nếu người dùng đã chọn file ảnh mới
     if (imageFile) {
       submitData.append('image', imageFile);
@@ -123,6 +166,8 @@ const Admin = () => {
       description: '',
       category: '' // Luôn reset về giá trị rỗng để hiển thị placeholder
     });
+    setSizes([]);
+    setToppings([]);
     setImageFile(null);
     setImagePreview(null);
     if (formRef.current) {
@@ -132,17 +177,15 @@ const Admin = () => {
 
   // ================= HÀM XÓA MÓN ĂN =================
   const handleDelete = async (productId) => {
-    // Gợi ý: Có thể thay thế window.confirm bằng một modal tùy chỉnh để đẹp hơn
     const confirmed = window.confirm('Bạn có chắc chắn muốn xóa món ăn này vĩnh viễn không?');
     if (!confirmed) {
-      return; // Nếu người dùng bấm "Cancel", không làm gì cả
+      return;
     }
 
     try {
-      // Gọi API với method DELETE tới đúng ID của sản phẩm
       await axios.delete(`/products/${productId}`);
       toast.success('Xóa món ăn thành công!');
-      fetchProducts(); // Tải lại danh sách món ăn để cập nhật giao diện
+      fetchProducts();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Lỗi khi xóa món ăn!');
       console.error('Lỗi xóa sản phẩm:', error);
@@ -159,6 +202,8 @@ const Admin = () => {
       description: product.description,
       category: product.category?._id || '', // Lấy ID của danh mục
     });
+    setSizes(Array.isArray(product.sizes) ? product.sizes.map(s => ({ name: s.name, priceOffset: s.priceOffset || 0 })) : []);
+    setToppings(Array.isArray(product.toppings) ? product.toppings.map(t => ({ name: t.name, price: t.price || 0 })) : []);
     setImageFile(null); // Reset file đang chọn
     setImagePreview(`${getImageUrl(product.image)}`); // Hiển thị ảnh hiện tại của sản phẩm
     // Cuộn lên đầu form để người dùng thấy
@@ -257,6 +302,102 @@ const Admin = () => {
                 ></textarea>
               </div>
 
+              {/* --- CẤU HÌNH KÍCH THƯỚC (SIZES) --- */}
+              <div className="border border-sky-100 rounded-xl p-3 bg-sky-50/30">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-gray-700 font-bold text-xs uppercase tracking-wider">
+                    📏 Kích cỡ món ăn ({sizes.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddSize}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-sky-600 bg-white border border-sky-200 px-2 py-1 rounded-lg hover:bg-sky-50 transition shadow-xs"
+                  >
+                    <FaPlus size={10} /> Thêm size
+                  </button>
+                </div>
+                {sizes.length === 0 ? (
+                  <p className="text-[11px] text-gray-400 italic">Chưa có size tùy chọn (Mặc định 1 size).</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {sizes.map((s, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-200 text-xs">
+                        <input
+                          type="text"
+                          placeholder="Tên size (VD: Lớn)"
+                          value={s.name}
+                          onChange={(e) => handleSizeChange(idx, 'name', e.target.value)}
+                          className="flex-1 px-2 py-1 border border-gray-200 rounded outline-none focus:border-sky-500"
+                        />
+                        <input
+                          type="number"
+                          placeholder="+ Giá (VNĐ)"
+                          value={s.priceOffset}
+                          onChange={(e) => handleSizeChange(idx, 'priceOffset', e.target.value)}
+                          className="w-24 px-2 py-1 border border-gray-200 rounded outline-none focus:border-sky-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSize(idx)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition"
+                          title="Xóa size"
+                        >
+                          <FaTrash size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* --- CẤU HÌNH TOPPING BÁN KÈM --- */}
+              <div className="border border-emerald-100 rounded-xl p-3 bg-emerald-50/30">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-gray-700 font-bold text-xs uppercase tracking-wider">
+                    🧀 Topping bán kèm ({toppings.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddTopping}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-white border border-emerald-200 px-2 py-1 rounded-lg hover:bg-emerald-50 transition shadow-xs"
+                  >
+                    <FaPlus size={10} /> Thêm topping
+                  </button>
+                </div>
+                {toppings.length === 0 ? (
+                  <p className="text-[11px] text-gray-400 italic">Chưa có topping đi kèm.</p>
+                ) : (
+                  <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    {toppings.map((t, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 bg-white p-1.5 rounded-lg border border-gray-200 text-xs">
+                        <input
+                          type="text"
+                          placeholder="Tên topping (VD: Phô mai)"
+                          value={t.name}
+                          onChange={(e) => handleToppingChange(idx, 'name', e.target.value)}
+                          className="flex-1 px-2 py-1 border border-gray-200 rounded outline-none focus:border-emerald-500"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Giá (VNĐ)"
+                          value={t.price}
+                          onChange={(e) => handleToppingChange(idx, 'price', e.target.value)}
+                          className="w-24 px-2 py-1 border border-gray-200 rounded outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTopping(idx)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition"
+                          title="Xóa topping"
+                        >
+                          <FaTrash size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block text-gray-600 font-semibold mb-2 text-sm">Hình ảnh minh họa *</label>
                 {/* Hiển thị ảnh preview */}
@@ -273,7 +414,7 @@ const Admin = () => {
               </div>
 
               <button type="submit" disabled={loading}
-                className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-xl transition duration-300 mt-4 disabled:bg-gray-400"
+                className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-xl transition duration-300 mt-4 disabled:bg-gray-400 shadow-md"
               >
                 {loading ? 'Đang lưu...' 
                   : isEditMode ? '💾 LƯU THAY ĐỔI' : '➕ TẠO MÓN ĂN'}
@@ -308,12 +449,25 @@ const Admin = () => {
                     <div className="w-24 h-24 bg-white rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
                       <img src={`${getImageUrl(product.image)}`} alt={product.name} className="w-full h-full object-cover" />
                     </div>
-                    <div className="flex flex-col justify-center">
+                    <div className="flex flex-col justify-center flex-1 min-w-0">
                       <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">{product.category?.name || 'Chưa phân loại'}</p>
                       <h3 className="font-bold text-gray-800 line-clamp-1 pr-8 mt-1">{product.name}</h3>
                       <p className="text-sky-500 font-black mt-1">
                         {(product.price || 0).toLocaleString('vi-VN')}đ
                       </p>
+                      {/* Hiển thị badge số lượng Size và Topping */}
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {product.sizes?.length > 0 && (
+                          <span className="text-[10px] font-bold bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded">
+                            {product.sizes.length} size
+                          </span>
+                        )}
+                        {product.toppings?.length > 0 && (
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
+                            {product.toppings.length} topping
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3 mt-2">
                         <button onClick={() => handleEditClick(product)} className="text-sky-500 text-sm font-semibold hover:text-sky-700 w-fit">Sửa</button>
                         <span className="text-gray-300">|</span>

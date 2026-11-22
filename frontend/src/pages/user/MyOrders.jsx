@@ -201,12 +201,15 @@ const MyOrders = () => {
         if (item.product && item.product._id) {
           const cartItem = {
             ...item.product,
+            productId: item.product._id,
             id: item.product._id,
-            price: item.price
+            price: item.price,
+            size: item.size,
+            toppings: item.toppings,
+            note: item.note,
+            quantity: item.quantity || 1
           };
-          for (let i = 0; i < (item.quantity || 1); i++) {
-            dispatch(addToCart(cartItem));
-          }
+          dispatch(addToCart(cartItem));
           addedCount += item.quantity || 1;
         }
       });
@@ -615,6 +618,27 @@ const MyOrders = () => {
                             <h4 className="font-bold text-slate-800 text-sm truncate">
                               {item.product?.name || 'Món ăn không còn khả dụng'}
                             </h4>
+
+                            {/* Badge Size & Topping */}
+                            {(item.size?.name || (item.toppings && item.toppings.length > 0)) && (
+                              <div className="flex flex-wrap gap-1 mt-0.5 text-[11px]">
+                                {item.size?.name && (
+                                  <span className="font-semibold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-100">
+                                    Size: {item.size.name}
+                                  </span>
+                                )}
+                                {item.toppings?.length > 0 && (
+                                  <span className="font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
+                                    +{item.toppings.map(t => t.name).join(', ')}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {item.note && (
+                              <p className="text-[10px] text-amber-700 italic mt-0.5">📝 {item.note}</p>
+                            )}
+
                             <p className="text-xs text-slate-500 font-medium mt-0.5">
                               Số lượng: <span className="font-bold text-slate-700">x{item.quantity}</span>
                               <span className="mx-1.5 text-slate-300">•</span>

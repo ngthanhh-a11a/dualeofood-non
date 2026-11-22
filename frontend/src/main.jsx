@@ -35,3 +35,16 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </Provider>
   </React.StrictMode>,
 )
+
+// Đăng ký PWA Service Worker an toàn
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('PWA ServiceWorker đã sẵn sàng:', registration.scope);
+      })
+      .catch((error) => {
+        console.warn('Lỗi đăng ký PWA ServiceWorker:', error);
+      });
+  });
+}

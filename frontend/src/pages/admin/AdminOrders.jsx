@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 // 1. Import socket.io-client
 import { useSocket } from '../../contexts/SocketContext';
@@ -31,14 +31,14 @@ const AdminOrders = () => {
   };
 
   // Gọi API lấy danh sách đơn hàng khi vào trang Admin
-  // Hàm này sẽ được gọi lại mỗi khi filter hoặc page thay đổi
-  const fetchOrders = async () => {
-    setLoading(true);
+  // isSilent: true khi muốn cập nhật ngầm không làm xoay loading
+  const fetchOrders = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
       // Gửi kèm tham số lọc và phân trang
       const response = await axios.get(`/orders?status=${filterStatus}&page=${pagination.currentPage}`);
-      const { orders, totalPages, currentPage } = response.data;
-      setOrders(orders);
+      const { orders: fetchedOrders, totalPages, currentPage } = response.data;
+      setOrders(fetchedOrders);
       setPagination({ currentPage, totalPages });
     } catch (error) {
       console.error('Lỗi khi tải danh sách đơn hàng:', error);
@@ -48,13 +48,13 @@ const AdminOrders = () => {
         setErrorMsg('Có lỗi xảy ra khi tải danh sách đơn hàng từ Server.');
       }
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
-  };
+  }, [filterStatus, pagination.currentPage]);
 
   useEffect(() => {
     fetchOrders();
-  }, [filterStatus, pagination.currentPage]); // Phụ thuộc vào bộ lọc và trang hiện tại
+  }, [fetchOrders]);
 
 
   // --- START: LOGIC MỚI ĐỂ "MỞ KHÓA" ÂM THANH TRÊN TRÌNH DUYỆT ---
@@ -86,37 +86,51 @@ const AdminOrders = () => {
   useEffect(() => {
     if (!socket) return;
 
-    // Lắng nghe sự kiện 'new_order' từ server
-    socket.on('new_order', (newOrder) => {
-      // Hiển thị thông báo toast có nút tải lại, giúp admin chủ động hơn
-      toast.custom((t) => (
-        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
-          <div className="flex-1 w-0 p-4">
-            <p className="font-medium text-gray-900">🔔 Có đơn hàng mới!</p>
-            <p className="mt-1 text-sm text-gray-500">Mã đơn: {newOrder._id.substring(0, 8)}</p>
-          </div>
-          <div className="flex border-l border-gray-200"><button onClick={() => { fetchOrders(); toast.dismiss(t.id); }} className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-sky-600 hover:text-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500">Tải lại</button></div>
-        </div>
-      ), { duration: 60000 }); // Tự ẩn sau 1 phút
+    // Lắng nghe sự kiện 'new_order' từ server: TỰ ĐỘNG CHÈN ĐƠN MỚI LÊN ĐẦU
+    const handleNewOrder = (newOrder) => {
+      setOrders(prevOrders => {
+        // Tránh trùng nếu đơn đã có trong danh sách
+        if (prevOrders.some(o => o._id === newOrder._id)) return prevOrders;
+        // Nếu đang xem tất cả hoặc đúng trạng thái của đơn mới
+        if (filterStatus === 'ALL' || filterStatus === newOrder.status) {
+          return [newOrder, ...prevOrders];
+        }
+        return prevOrders;
+      });
 
-      // --- PHÁT ÂM THANH THÔNG BÁO (ĐÃ CẢI TIẾN) ---
+      // Tự động đồng bộ ngầm dữ liệu chuẩn và tổng số trang từ server
+      fetchOrders(true);
+
+      // Phát âm thanh thông báo
       const playNotificationSound = async () => {
         try {
-          const audio = new Audio('/notification.mp3'); // Đảm bảo file này có trong thư mục /public
+          const audio = new Audio('/notification.mp3');
           await audio.play();
         } catch (err) {
           console.warn('Không thể tự động phát âm thanh thông báo:', err);
         }
       };
       playNotificationSound();
-    });
-
-    // Dọn dẹp listener khi component bị hủy
-    return () => {
-      socket.off('new_order');
-      socket.off('order_status_updated');
     };
-  }, [socket, fetchOrders]);
+
+    // Lắng nghe sự kiện 'order_status_updated': TỰ ĐỘNG CẬP NHẬT TRẠNG THÁI REALTIME
+    const handleOrderStatusUpdated = (updatedOrder) => {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order._id === updatedOrder._id ? { ...order, ...updatedOrder } : order
+        )
+      );
+    };
+
+    socket.on('new_order', handleNewOrder);
+    socket.on('order_status_updated', handleOrderStatusUpdated);
+
+    // Dọn dẹp listener khi component bị hủy hoặc dependencies thay đổi
+    return () => {
+      socket.off('new_order', handleNewOrder);
+      socket.off('order_status_updated', handleOrderStatusUpdated);
+    };
+  }, [socket, filterStatus, fetchOrders]);
 
   // Hàm cập nhật trạng thái đơn hàng
   const handleUpdateStatus = async (id, newStatus) => {
@@ -235,29 +249,43 @@ const AdminOrders = () => {
                     <p className="text-sm text-gray-500">{order.customerInfo?.phone || 'N/A'}</p>
                     <p className="text-xs text-gray-400 mt-1 line-clamp-1 w-40" title={order.customerInfo?.address}>{order.customerInfo?.address || 'N/A'}</p>
                     {order.customerInfo?.location?.lat && order.customerInfo?.location?.lng && (
-                      <a 
-                        href={`https://www.google.com/maps?q=${order.customerInfo.location.lat},${order.customerInfo.location.lng}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 transition mt-1"
-                        title="Mở chỉ đường Google Maps tới vị trí khách hàng"
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        🗺️ Bản đồ GPS
-                      </a>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                        <a 
+                          href={`https://www.google.com/maps?q=${order.customerInfo.location.lat},${order.customerInfo.location.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hover:bg-emerald-100 transition"
+                          title="Mở chỉ đường Google Maps tới vị trí khách hàng"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          🗺️ Bản đồ GPS
+                        </a>
+                        {order.distanceKm > 0 && (
+                          <span className="text-[10px] font-bold bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded border border-sky-200">
+                            {order.distanceKm} km
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td className="p-4">
-                    <div 
-                      className="text-sm text-gray-700 w-48 line-clamp-2" 
-                      title={order.items?.map(item => `${item.product?.name || 'Món đã xóa'} (x${item.quantity})`).join(', ')}
-                    >
+                    <div className="text-sm text-gray-700 w-56 space-y-1.5 max-h-24 overflow-y-auto pr-1">
                       {order.items?.map((item, index) => (
-                        <span key={index}>
-                          {item.product?.name || <span className="text-red-500 italic">Món đã xóa</span>} 
-                          <span className="text-gray-400">(x{item.quantity})</span>
-                          {index < order.items.length - 1 ? ', ' : ''}
-                        </span>
+                        <div key={index} className="text-xs border-b border-gray-50 pb-1 last:border-none">
+                          <p className="font-semibold text-gray-800">
+                            {item.product?.name || <span className="text-red-500 italic">Món đã xóa</span>}
+                            <span className="text-sky-600 font-bold ml-1">x{item.quantity}</span>
+                          </p>
+                          {(item.size?.name || (item.toppings && item.toppings.length > 0)) && (
+                            <p className="text-[11px] text-gray-500">
+                              {item.size?.name && <span className="font-medium text-sky-700">[{item.size.name}] </span>}
+                              {item.toppings?.length > 0 && <span className="text-emerald-700">+{item.toppings.map(t => t.name).join(', ')}</span>}
+                            </p>
+                          )}
+                          {item.note && (
+                            <p className="text-[10px] text-amber-700 italic">📝 {item.note}</p>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </td>

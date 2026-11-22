@@ -253,15 +253,15 @@ const AuthModal = () => {
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
-    // Nhảy sang ô tiếp theo
+    // Nhảy sang ô tiếp theo an toàn với optional chaining
     if (value !== '' && index < 5) {
-      inputRefs.current[index + 1].focus();
+      inputRefs.current[index + 1]?.focus();
     }
   };
 
   const handleOtpKeyDown = (index, e) => {
     if (e.key === 'Backspace' && otp[index] === '' && index > 0) {
-      inputRefs.current[index - 1].focus();
+      inputRefs.current[index - 1]?.focus();
     }
   };
 
@@ -360,7 +360,7 @@ const AuthModal = () => {
       });
       toast.success('Đã gửi lại mã OTP!');
       setOtp(['', '', '', '', '', '']); // Xóa OTP cũ
-      inputRefs.current[0].focus();
+      inputRefs.current[0]?.focus();
       startResendTimer();
     } catch (error) {
       toast.error('Không thể gửi lại mã lúc này.');
@@ -409,7 +409,7 @@ const AuthModal = () => {
     } catch (error) {
       toast.error(error.response?.data?.message || 'Mã OTP không đúng!');
       setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0].focus();
+      inputRefs.current[0]?.focus();
     } finally {
       setLoading(false);
     }
@@ -546,6 +546,7 @@ const AuthModal = () => {
 
         .wave-group .wave-input:focus ~ .wave-label .wave-char,
         .wave-group .wave-input:not(:placeholder-shown) ~ .wave-label .wave-char,
+        .wave-group .wave-input:-webkit-autofill ~ .wave-label .wave-char,
         .wave-group .wave-input:valid ~ .wave-label .wave-char {
           transform: translateY(-22px);
           font-size: 13px;

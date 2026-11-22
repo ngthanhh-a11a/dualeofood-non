@@ -8,11 +8,21 @@ const orderSchema = new mongoose.Schema({
         // Dòng này để biết khách đặt món gì:
         product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true }, 
         quantity: { type: Number, required: true, min: 1 },
-        price: { type: Number, required: true } // Giá lúc khách bấm mua
+        price: { type: Number, required: true }, // Giá lúc khách bấm mua (đã gồm size & topping)
+        size: {
+            name: { type: String, default: null },
+            priceOffset: { type: Number, default: 0 }
+        },
+        toppings: [{
+            name: { type: String },
+            price: { type: Number }
+        }],
+        note: { type: String, default: '' }
     }],
     totalAmount: { type: Number, required: true }, 
     discountAmount: { type: Number, default: 0 }, 
     shippingFee: { type: Number, default: 0 }, 
+    distanceKm: { type: Number, default: 0 }, // Khoảng cách giao hàng tính bằng km
     finalAmount: { type: Number, required: true }, 
     paymentMethod: { type: String, enum: ['CASH', 'QR_CODE'], required: true },
     customerInfo: {

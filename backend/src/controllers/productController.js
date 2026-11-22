@@ -9,10 +9,24 @@ const User = require('../models/User');
 const cloudinary = require('../config/cloudinary');
 
 
+// Helper parse JSON field an toàn từ FormData
+const parseJsonField = (field) => {
+    if (!field) return [];
+    if (typeof field === 'string') {
+        try {
+            const parsed = JSON.parse(field);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    return Array.isArray(field) ? field : [];
+};
+
 // ================= THÊM MÓN ĂN MỚI (CHỈ ADMIN) =================
 const createProduct = asyncHandler(async (req, res) => {
-    // 1. Lấy thông tin text từ form (Tên, giá, mô tả...)
-    const { name, price, description, category } = req.body; // 'category' bây giờ là categoryId
+    // 1. Lấy thông tin text từ form (Tên, giá, mô tả, size, topping...)
+    const { name, price, description, category, sizes, toppings } = req.body;
 
     // 2. Lấy đường dẫn file ảnh do Multer (Cloudinary) trả về
     const image = req.file ? req.file.path : '';
@@ -27,7 +41,9 @@ const createProduct = asyncHandler(async (req, res) => {
       price,
       description,
       image, // Lưu đường dẫn ảnh vào DB
-      category // Lưu ObjectId của category
+      category, // Lưu ObjectId của category
+      sizes: parseJsonField(sizes),
+      toppings: parseJsonField(toppings)
     });
 
     const createdProduct = await product.save();
@@ -132,7 +148,7 @@ const deleteProduct = asyncHandler(async (req, res) => {
 // ================= CẬP NHẬT MÓN ĂN (CHỈ ADMIN) =================
 const updateProduct = asyncHandler(async (req, res) => {
     const { id } = req.params; // Product ID
-    const { name, price, description, category } = req.body;
+    const { name, price, description, category, sizes, toppings } = req.body;
 
     const product = await Product.findById(id);
     if (!product) {
@@ -144,6 +160,13 @@ const updateProduct = asyncHandler(async (req, res) => {
     product.price = price || product.price;
     product.description = description || product.description;
     product.category = category || product.category;
+
+    if (sizes !== undefined) {
+        product.sizes = parseJsonField(sizes);
+    }
+    if (toppings !== undefined) {
+        product.toppings = parseJsonField(toppings);
+    }
 
     // Kiểm tra nếu có file ảnh mới được tải lên
     if (req.file) {
@@ -180,6 +203,10 @@ const updateProduct = asyncHandler(async (req, res) => {
 const getProductById = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id)
         .populate('category', 'name slug')
+        .populate({
+            path: 'upsellProducts',
+            populate: { path: 'category', select: 'name slug' }
+        })
         .populate('reviews.user', 'avatar');
     if (product) {
         res.status(200).json(product);
@@ -378,6 +405,147 @@ const toggleProductReviewPin = asyncHandler(async (req, res) => {
     });
 });
 
+// ================= LẤY DANH SÁCH MÓN GỢI Ý BÁN KÈM (SMART UPSELL) =================
+const getUpsellSuggestions = asyncHandler(async (req, res) => {
+    const { cartProductIds } = req.query;
+    let excludedIds = [];
+
+    if (cartProductIds) {
+        if (Array.isArray(cartProductIds)) {
+            excludedIds = cartProductIds;
+        } else if (typeof cartProductIds === 'string') {
+            excludedIds = cartProductIds.split(',').map(id => id.trim()).filter(Boolean);
+        }
+    }
+
+    // Trích xuất ObjectId sạch kể cả khi client gửi lên composite ID như "productId-size-topping-note"
+    const cleanedIds = excludedIds.map(id => {
+        if (typeof id === 'string' && id.includes('-')) {
+            return id.split('-')[0].trim();
+        }
+        return String(id || '').trim();
+    }).filter(Boolean);
+
+    const validExcludedObjectIds = Array.from(new Set(
+        cleanedIds.filter(id => mongoose.Types.ObjectId.isValid(id))
+    )).map(id => new mongoose.Types.ObjectId(id));
+
+    let suggestedProducts = [];
+    const seenIds = new Set(validExcludedObjectIds.map(id => id.toString()));
+
+    // 1. Tầng 1: Lấy các món được cấu hình upsell trực tiếp từ các món trong giỏ
+    if (validExcludedObjectIds.length > 0) {
+        const cartProducts = await Product.find({ _id: { $in: validExcludedObjectIds } })
+            .populate({
+                path: 'upsellProducts',
+                populate: { path: 'category', select: 'name slug' }
+            });
+
+        for (const cp of cartProducts) {
+            if (Array.isArray(cp.upsellProducts)) {
+                for (const up of cp.upsellProducts) {
+                    if (up && up._id) {
+                        const upIdStr = up._id.toString();
+                        if (!seenIds.has(upIdStr)) {
+                            seenIds.add(upIdStr);
+                            suggestedProducts.push(up);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Tầng 2: Nếu chưa đủ 8 món, tìm các món phụ/đồ uống (nước giải khát, ăn vặt) giá <= 40.000đ
+    if (suggestedProducts.length < 8) {
+        const sideCategories = await Category.find({
+            $or: [
+                { name: { $regex: /nước|đồ uống|uống|giải khát|ăn vặt|phụ|kèm|tráng miệng|snack|drink/i } },
+                { slug: { $regex: /nuoc|do-uong|uong|giai-khat|an-vat|phu|kem|trang-mieng|snack|drink/i } }
+            ]
+        }).select('_id');
+
+        const sideCatIds = sideCategories.map(c => c._id);
+
+        const sideFilter = {
+            _id: { $nin: Array.from(seenIds).map(id => new mongoose.Types.ObjectId(id)) }
+        };
+
+        if (sideCatIds.length > 0) {
+            sideFilter.category = { $in: sideCatIds };
+        } else {
+            sideFilter.price = { $lte: 40000 };
+        }
+
+        const sideProducts = await Product.find(sideFilter)
+            .populate('category', 'name slug')
+            .sort({ averageRating: -1, numReviews: -1, price: 1 })
+            .limit(8 - suggestedProducts.length);
+
+        for (const sp of sideProducts) {
+            const spIdStr = sp._id.toString();
+            if (!seenIds.has(spIdStr)) {
+                seenIds.add(spIdStr);
+                suggestedProducts.push(sp);
+            }
+        }
+    }
+
+    // 3. Tầng 3: Dự phòng thông minh - Lấy các món ghim hoặc món bán chạy
+    if (suggestedProducts.length < 8) {
+        const fallbackProducts = await Product.find({
+            _id: { $nin: Array.from(seenIds).map(id => new mongoose.Types.ObjectId(id)) }
+        })
+            .populate('category', 'name slug')
+            .sort({ isPinned: -1, averageRating: -1, numReviews: -1 })
+            .limit(8 - suggestedProducts.length);
+
+        for (const fp of fallbackProducts) {
+            const fpIdStr = fp._id.toString();
+            if (!seenIds.has(fpIdStr)) {
+                seenIds.add(fpIdStr);
+                suggestedProducts.push(fp);
+            }
+        }
+    }
+
+    res.status(200).json({
+        success: true,
+        count: suggestedProducts.length,
+        products: suggestedProducts
+    });
+});
+
+// ================= CẬP NHẬT MÓN BÁN KÈM (CHỈ ADMIN) =================
+const updateProductUpsells = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { upsellProductIds } = req.body;
+
+    const product = await Product.findById(id);
+    if (!product) {
+        return res.status(404).json({ message: 'Không tìm thấy món ăn!' });
+    }
+
+    // Lọc các id hợp lệ và loại bỏ chính id của sản phẩm này (tránh self-reference)
+    const validIds = (Array.isArray(upsellProductIds) ? upsellProductIds : [])
+        .filter(targetId => targetId && targetId.toString() !== id.toString() && mongoose.Types.ObjectId.isValid(targetId));
+
+    product.upsellProducts = validIds;
+    await product.save();
+
+    const populatedProduct = await Product.findById(id)
+        .populate('category', 'name slug')
+        .populate({
+            path: 'upsellProducts',
+            populate: { path: 'category', select: 'name slug' }
+        });
+
+    res.status(200).json({
+        message: 'Cập nhật món gợi ý bán kèm thành công!',
+        product: populatedProduct
+    });
+});
+
 // NHỚ XUẤT ĐÚNG TÊN HÀM Ở ĐÂY THÌ BÊN ROUTE MỚI ĐỌC ĐƯỢC
 module.exports = { 
     createProduct, 
@@ -391,5 +559,7 @@ module.exports = {
     getPinnedProducts, 
     toggleProductReviewVisibility, 
     getAllProductReviews, 
-    toggleProductReviewPin
+    toggleProductReviewPin,
+    getUpsellSuggestions,
+    updateProductUpsells
 };

@@ -10,12 +10,22 @@ const { emitAdminPendingCounts } = require('../utils/adminRealtime');
 // [POST] Tạo đơn hàng mới (Dành cho Customer đã đăng nhập)
 exports.createOrder = async (req, res) => {
     try {
-        const { items, paymentMethod, userVoucherId, couponCode, customerInfo, shippingFee = 0 } = req.body;
+        const { items, paymentMethod, userVoucherId, couponCode, customerInfo, shippingFee = 0, distanceKm = 0 } = req.body;
+
+        // Bắt buộc đơn hàng phải có tọa độ GPS (Định vị hoặc chọn qua bản đồ)
+        if (!customerInfo?.location?.lat || !customerInfo?.location?.lng) {
+            return res.status(400).json({ 
+                message: 'Vui lòng chọn vị trí trên bản đồ hoặc bật GPS để hệ thống tính phí và giao hàng chính xác!' 
+            });
+        }
+
         let totalAmount = 0;
         const orderItems = [];
 
-        // Tối ưu hóa: Lấy tất cả sản phẩm trong 1 lần gọi DB
-        const productIds = items.map(item => item.id);
+        // Tối ưu hóa: Lấy tất cả sản phẩm trong 1 lần gọi DB (hỗ trợ cả productId, product và id)
+        const productIds = items
+            .map(item => item.productId || item.product || item.id)
+            .filter(id => id && mongoose.Types.ObjectId.isValid(id));
         const productsFromDB = await Product.find({ _id: { $in: productIds } });
 
         // Tạo một map để truy cập sản phẩm nhanh hơn
@@ -23,18 +33,42 @@ exports.createOrder = async (req, res) => {
 
         // Lặp qua các sản phẩm trong giỏ hàng để tính toán
         for (const item of items) {
-            const product = productMap.get(item.id);
+            const rawId = (item.productId || item.product || item.id)?.toString();
+            const product = productMap.get(rawId);
 
             if (!product) {
-                return res.status(404).json({ message: `Sản phẩm với ID: ${item.id} không tồn tại.` });
+                return res.status(404).json({ message: `Sản phẩm với ID: ${rawId} không tồn tại.` });
             }
 
-            totalAmount += product.price * item.quantity;
+            // Tính đơn giá an toàn từ DB: Giá gốc + Size offset + Toppings
+            let itemUnitPrice = product.price;
+            let itemSize = null;
+            if (item.size && item.size.name) {
+                const dbSize = product.sizes?.find(s => s.name === item.size.name);
+                const offset = dbSize ? dbSize.priceOffset : (Number(item.size.priceOffset) || 0);
+                itemUnitPrice += offset;
+                itemSize = { name: item.size.name, priceOffset: offset };
+            }
+
+            let itemToppings = [];
+            if (Array.isArray(item.toppings) && item.toppings.length > 0) {
+                item.toppings.forEach(t => {
+                    const dbTop = product.toppings?.find(pt => pt.name === t.name);
+                    const topPrice = dbTop ? dbTop.price : (Number(t.price) || 0);
+                    itemUnitPrice += topPrice;
+                    itemToppings.push({ name: t.name, price: topPrice });
+                });
+            }
+
+            totalAmount += itemUnitPrice * item.quantity;
 
             orderItems.push({
                 product: product._id,
                 quantity: item.quantity,
-                price: product.price // Lưu lại giá chốt tại thời điểm mua
+                price: itemUnitPrice, // Lưu lại giá chốt tại thời điểm mua (đã gồm size & topping)
+                size: itemSize,
+                toppings: itemToppings,
+                note: item.note ? String(item.note).trim() : ''
             });
         }
 
@@ -98,6 +132,7 @@ exports.createOrder = async (req, res) => {
             totalAmount,
             discountAmount: calculatedDiscount, // Sử dụng số tiền giảm giá đã được tính toán an toàn
             shippingFee,
+            distanceKm: Number(distanceKm) || 0,
             finalAmount,
             paymentMethod,
             customerInfo,
@@ -399,8 +434,9 @@ exports.updateOrderStatus = async (req, res) => {
         req.io.to('admin_room').emit('update_pending_orders_count', pendingCount);
         emitAdminPendingCounts(req.io);
 
-        // Gửi thông báo cập nhật trạng thái đến khách hàng sở hữu đơn hàng này
+        // Gửi thông báo cập nhật trạng thái đến khách hàng sở hữu đơn hàng này và phòng admin
         req.io.to(updatedOrder.user.toString()).emit('order_status_updated', updatedOrder);
+        req.io.to('admin_room').emit('order_status_updated', updatedOrder);
 
         // Nếu trạng thái là COMPLETED hoặc CANCELLED, dashboard cần cập nhật
         if (status === 'COMPLETED' || status === 'CANCELLED') {

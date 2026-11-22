@@ -89,6 +89,13 @@ const OrderReceipt = ({ order }) => {
                     <div key={index} className="flex mb-2 items-start">
                         <div className="flex-1 pr-1">
                             <span className="font-semibold">{item.product?.name || 'Món đã xóa'}</span>
+                            {item.size?.name && <span className="receipt-text-sm font-bold ml-1">({item.size.name})</span>}
+                            {item.toppings?.length > 0 && (
+                                <div className="receipt-text-sm text-gray-600">+ {item.toppings.map(t => t.name).join(', ')}</div>
+                            )}
+                            {item.note && (
+                                <div className="receipt-text-sm italic text-gray-600">Ghi chú: {item.note}</div>
+                            )}
                             <div className="receipt-text-sm text-gray-700">{item.price?.toLocaleString('vi-VN')}đ</div>
                         </div>
                         <div className="w-8 text-center font-bold mt-0.5">{item.quantity}</div>
@@ -105,7 +112,7 @@ const OrderReceipt = ({ order }) => {
                     <span>{order.totalAmount?.toLocaleString('vi-VN')}đ</span>
                 </div>
                 <div className="flex justify-between">
-                    <span>Phí ship:</span>
+                    <span>Phí ship{order.distanceKm > 0 ? ` (${order.distanceKm} km)` : ''}:</span>
                     <span>{order.shippingFee ? order.shippingFee.toLocaleString('vi-VN') : '0'}đ</span>
                 </div>
                 {order.discountAmount > 0 && (

@@ -285,6 +285,12 @@ const StaffOrders = () => {
                                 <FiMapPin className="text-gray-400 mt-0.5" size={12} />
                                 <span className="line-clamp-2">{order.customerInfo.address}</span>
                               </div>
+                              {order.customerInfo.location?.lat && (
+                                <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                  <span>🗺️ GPS</span>
+                                  {order.distanceKm > 0 && <span className="font-bold">• {order.distanceKm} km</span>}
+                                </div>
+                              )}
                               {order.customerInfo.note && (
                                 <div className="flex items-start gap-1">
                                   <FiFileText className="text-gray-400 mt-0.5" size={12} />
@@ -298,11 +304,22 @@ const StaffOrders = () => {
 
                       {/* Danh sách món (khi mở rộng) */}
                       {expandedOrder === order._id && order.items && (
-                        <div className="mb-2 text-xs border-t border-gray-100 pt-2 space-y-1">
+                        <div className="mb-2 text-xs border-t border-gray-100 pt-2 space-y-1.5">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="flex justify-between text-gray-600">
-                              <span className="truncate flex-1">{item.product?.name || 'Sản phẩm'} x{item.quantity}</span>
-                              <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
+                            <div key={idx} className="border-b border-gray-50 pb-1 last:border-none">
+                              <div className="flex justify-between text-gray-700 font-semibold">
+                                <span className="truncate flex-1">{item.product?.name || 'Sản phẩm'} <span className="text-sky-600 font-bold">x{item.quantity}</span></span>
+                                <span className="font-bold">{formatCurrency((item.price || 0) * (item.quantity || 1))}</span>
+                              </div>
+                              {(item.size?.name || (item.toppings && item.toppings.length > 0)) && (
+                                <p className="text-[11px] text-gray-500 mt-0.5">
+                                  {item.size?.name && <span className="text-sky-700 font-bold">[{item.size.name}] </span>}
+                                  {item.toppings?.length > 0 && <span className="text-emerald-700">+{item.toppings.map(t => t.name).join(', ')}</span>}
+                                </p>
+                              )}
+                              {item.note && (
+                                <p className="text-[10px] text-amber-700 italic">📝 {item.note}</p>
+                              )}
                             </div>
                           ))}
                         </div>

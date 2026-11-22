@@ -7,15 +7,43 @@ import { FiStar, FiEdit, FiPlay, FiPause, FiVolume2, FiVolumeX } from 'react-ico
 import ReviewModal from '../../components/features/ReviewModal';
 import toast from 'react-hot-toast';
 import StarRating from '../../components/common/StarRating'; // Import component
+import ProductModal from '../../components/features/ProductModal';
 import { useConfetti } from '../../hooks/useConfetti';
 import PromotionalBanner from '../../components/features/PromotionalBanner'; // Import component banner
 import { useAddToCartAnimation } from '../../hooks/useAddToCartAnimation'; // Import hook animation
+import { usePWA } from '../../utils/usePWA';
+import IOSInstallModal from '../../components/common/IOSInstallModal';
+import { FiDownload, FiCheck, FiSmartphone } from 'react-icons/fi';
+import { FaApple } from 'react-icons/fa';
 
 const Home = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate(); // 2. Initialize navigate
   const { fireFromElement, fireJackpot } = useConfetti();
   const { flyToCart } = useAddToCartAnimation(); // Khởi tạo hook animation
+
+  // Quản lý PWA Cài đặt ứng dụng
+  const { canInstall, isInstalled, isIOS, installPWA } = usePWA();
+  const [isIOSModalOpen, setIsIOSModalOpen] = useState(false);
+
+  const handleInstallClick = async () => {
+    if (isIOS) {
+      setIsIOSModalOpen(true);
+      return;
+    }
+    const result = await installPWA();
+    if (!result.success) {
+      if (result.isIOS) {
+        setIsIOSModalOpen(true);
+      } else {
+        toast('Để cài đặt: Nhấn menu trình duyệt (⋮) -> chọn "Cài đặt ứng dụng" hoặc "Thêm vào MH chính"', {
+          icon: '📲',
+          duration: 6000,
+          style: { borderRadius: '14px', background: '#0284c7', color: '#fff', fontWeight: 'bold' }
+        });
+      }
+    }
+  };
 
   // States để quản lý modal đánh giá
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -227,17 +255,35 @@ const Home = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // State mở modal tùy biến món (Size & Topping)
+  const [selectedProductForModal, setSelectedProductForModal] = useState(null);
+
   const handleAddToCart = (product, event) => {
-    // Dispatch action to Redux as before
+    const hasOptions = (Array.isArray(product.sizes) && product.sizes.length > 0) || 
+                       (Array.isArray(product.toppings) && product.toppings.length > 0);
+
+    if (hasOptions) {
+      setSelectedProductForModal(product);
+      return;
+    }
+
+    // Món thường không có tùy biến: thêm trực tiếp vào giỏ
     dispatch(addToCart({
       id: product._id,
+      productId: product._id,
       name: product.name,
       price: product.price,
-      image: product.image, // Also save the image to Redux
+      image: product.image,
+      quantity: 1
     }));
 
-    // Kích hoạt animation từ hook
     flyToCart(event);
+  };
+
+  const handleAddFromModal = (itemPayload, event) => {
+    dispatch(addToCart(itemPayload));
+    flyToCart(event);
+    setSelectedProductForModal(null);
   };
 
   const handleOpenReviewModal = (product) => {
@@ -871,53 +917,122 @@ const Home = () => {
         <PromotionalBanner />
       </section>
 
-      {/* ================= SECTION 3: APP PROMO ================= */}
+      {/* ================= SECTION 3: APP PROMO (PWA INSTALLATION HUB) ================= */}
       <section 
         ref={promoRef}
         data-section="promo"
         className={`container mx-auto px-4 mb-24 transition-all duration-1000 transform ${visibleSections.promo ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-16'}`}
       >
-        <div className="bg-sky-600 rounded-[3rem] p-12 md:p-20 text-white flex flex-col md:flex-row items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.1)] relative overflow-hidden">
+        <div className="bg-gradient-to-br from-sky-600 to-sky-700 rounded-[3rem] p-8 sm:p-12 md:p-16 text-white flex flex-col md:flex-row items-center justify-between shadow-[0_12px_32px_rgba(2,132,199,0.25)] relative overflow-hidden">
           {/* Background decoration */}
-          <div className="absolute -top-24 -right-24 w-64 h-64 bg-sky-500/50 opacity-10 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-sky-400/50 opacity-20 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -top-24 -right-24 w-80 h-80 bg-sky-400/30 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-sky-300/20 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="w-full md:w-3/5 relative z-10 text-center md:text-left mb-10 md:mb-0">
-            <h2 className="text-3xl md:text-5xl font-black mb-6 leading-tight">
-              Tải Ứng Dụng Ngay <br/> Sắp Ra Mắt (Coming Soon)!
-            </h2>
-            <p className="text-sky-100 text-lg md:text-xl mb-10 max-w-lg mx-auto md:mx-0">
-              Ứng dụng DualeoFood sắp chính thức có mặt trên di động. Hãy đón chờ phiên bản dành riêng cho <span className="font-bold text-white bg-sky-500/50 px-3 py-1.5 rounded-lg ml-1 mr-1">iOS & Android</span> với vô vàn ưu đãi bùng nổ!
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-              <button className="bg-white hover:bg-sky-100 text-sky-600 font-bold py-4 px-8 rounded-full flex items-center justify-center gap-3 transition transform hover:-translate-y-1 shadow-lg active:scale-95">
-                App Store (Coming Soon)
-              </button>
-              <button 
-                onClick={handleFeatureBoxClick}
-                className="bg-white hover:bg-sky-100 text-sky-600 font-bold py-4 px-8 rounded-full flex items-center justify-center gap-3 transition transform hover:-translate-y-1 shadow-lg active:scale-95"
-              >
-                Google Play (Coming Soon)
-              </button>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-xs text-xs font-bold uppercase tracking-wider text-sky-100 mb-4 border border-white/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span>Ứng dụng di động PWA</span>
             </div>
+
+            <h2 className="text-3xl md:text-5xl font-black mb-5 leading-tight tracking-tight">
+              Cài Đặt App DualeoFood <br className="hidden sm:inline"/> Trải Nghiệm 1 Chạm Siêu Tốc!
+            </h2>
+            <p className="text-sky-100 text-base md:text-lg mb-8 max-w-lg mx-auto md:mx-0 leading-relaxed">
+              Mở nhanh ngay từ màn hình chính, lướt mượt mà không tốn dung lượng, nhận thông báo đẩy thời gian thực và voucher ưu đãi độc quyền.
+            </p>
+
+            {isInstalled ? (
+              <div className="inline-flex items-center gap-3 bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 px-6 py-4 rounded-2xl">
+                <FiCheck className="text-emerald-400 text-2xl shrink-0" />
+                <span className="font-bold text-sm">
+                  Bạn đang sử dụng phiên bản Ứng Dụng DualeoFood chính thức!
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3.5 justify-center md:justify-start">
+                <button 
+                  onClick={handleInstallClick}
+                  className="bg-white hover:bg-sky-50 text-sky-600 font-black py-4 px-7 rounded-2xl flex items-center justify-center gap-2.5 transition transform hover:-translate-y-0.5 shadow-lg active:scale-95 cursor-pointer text-sm md:text-base"
+                >
+                  <FiDownload size={18} />
+                  <span>Cài Đặt App Ngay</span>
+                </button>
+                <button 
+                  onClick={() => setIsIOSModalOpen(true)}
+                  className="bg-sky-500/40 hover:bg-sky-500/60 text-white font-bold py-4 px-6 rounded-2xl flex items-center justify-center gap-2.5 transition transform hover:-translate-y-0.5 border border-white/25 active:scale-95 cursor-pointer text-sm"
+                >
+                  <FaApple size={18} />
+                  <span>Dành Cho iPhone / iPad</span>
+                </button>
+              </div>
+            )}
           </div>
           
           <div className="w-full md:w-2/5 relative z-10 flex justify-center">
-            {/* Simple CSS phone screen mockup */}
-            <div className="w-64 h-[28rem] bg-slate-800 rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden relative flex flex-col items-center pt-8">
-              <div className="w-32 h-6 bg-slate-900 absolute top-0 rounded-b-3xl"></div>
-              <div className="text-5xl mb-6 mt-4 animate-bounce">🍔</div>
-              <h3 className="text-white font-black text-2xl mb-8">DualeoFood</h3>
-              <div className="w-48 h-32 bg-slate-700 rounded-2xl mb-4 animate-pulse flex items-center justify-center">
-                <span className="text-xs font-bold text-sky-300 uppercase tracking-widest">Coming Soon</span>
+            {/* Phone screen mockup hiện đại với giao diện app thật */}
+            <div className="w-64 h-[29rem] bg-slate-900 rounded-[3rem] border-[7px] border-slate-800 shadow-2xl overflow-hidden relative flex flex-col items-center pt-3 px-3">
+              {/* Dynamic Island / Tai thỏ */}
+              <div className="w-24 h-4 bg-black rounded-full mb-3 shadow-inner"></div>
+
+              {/* Màn hình App bên trong */}
+              <div className="w-full flex-1 bg-gradient-to-b from-sky-50 to-white rounded-2xl p-3 flex flex-col justify-between text-slate-800 border border-sky-100/50 shadow-inner">
+                {/* Header App Mini */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-lg">🍔</span>
+                    <span className="font-black text-xs text-sky-600">DualeoFood</span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
+                    Online
+                  </span>
+                </div>
+
+                {/* Banner mini */}
+                <div className="p-3 bg-gradient-to-r from-sky-500 to-sky-600 rounded-xl text-white text-center shadow-xs">
+                  <p className="text-[10px] uppercase font-bold text-sky-200">Ưu Đãi Độc Quyền</p>
+                  <p className="text-xs font-black">Giảm 20% Đơn Đầu</p>
+                </div>
+
+                {/* Danh sách món mini */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🍟</span>
+                      <span className="text-[11px] font-bold text-slate-700">Khoai Tây Chiên</span>
+                    </div>
+                    <span className="text-[10px] font-black text-sky-600">25.000đ</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-white border border-slate-100 shadow-2xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🍗</span>
+                      <span className="text-[11px] font-bold text-slate-700">Gà Giòn Cay</span>
+                    </div>
+                    <span className="text-[10px] font-black text-sky-600">35.000đ</span>
+                  </div>
+                </div>
+
+                {/* Nút Cài đặt / Mở app ở chân mockup */}
+                <button 
+                  onClick={handleInstallClick}
+                  className="w-full py-2.5 bg-sky-500 hover:bg-sky-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md shadow-sky-500/30 cursor-pointer"
+                >
+                  <FiSmartphone size={13} />
+                  <span>{isInstalled ? 'Mở App Trực Tiếp' : 'Cài Đặt App 1 Chạm'}</span>
+                </button>
               </div>
-              <div className="w-48 h-12 bg-sky-500 rounded-full animate-pulse mt-4 flex items-center justify-center text-white text-xs font-bold">
-                Sắp Ra Mắt
-              </div>
+
+              {/* Thanh gạch dưới của iPhone */}
+              <div className="w-24 h-1 bg-slate-600 rounded-full my-2"></div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Modal Hướng Dẫn Cài Đặt Cho iOS */}
+      <IOSInstallModal
+        isOpen={isIOSModalOpen}
+        onClose={() => setIsIOSModalOpen(false)}
+      />
       {/* Render Modal Đánh giá */}
       {isReviewModalOpen && productToReview && (
         <ReviewModal
@@ -953,6 +1068,16 @@ const Home = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Product Customizer Modal (Size & Topping) */}
+      {selectedProductForModal && (
+        <ProductModal
+          product={selectedProductForModal}
+          isOpen={!!selectedProductForModal}
+          onClose={() => setSelectedProductForModal(null)}
+          onAddToCart={handleAddFromModal}
+        />
       )}
 
     </div>

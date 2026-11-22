@@ -26,8 +26,14 @@ router.get('/', productController.getProducts);
 // Lấy tất cả đánh giá (Admin)
 router.get('/reviews/all', verifyToken, adminOrStaff, productController.getAllProductReviews);
 
+// Route lấy gợi ý bán kèm thông minh tại Giỏ hàng (phải đặt trước route /:id)
+router.get('/upsell-suggestions', productController.getUpsellSuggestions);
+
 // Route lấy thống kê đánh giá (phải đặt trước route /:id)
 router.get('/stats/reviews', verifyToken, isAdmin, productController.getProductReviewStats);
+
+// Route cập nhật món bán kèm (Chỉ Admin)
+router.put('/:id/upsell', verifyToken, isAdmin, productController.updateProductUpsells);
 
 // Route công khai để ai cũng xem được chi tiết sản phẩm
 router.get('/:id', productController.getProductById);

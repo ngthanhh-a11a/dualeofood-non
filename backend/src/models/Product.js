@@ -25,6 +25,24 @@ const productSchema = new mongoose.Schema({
     },
     isPinned: { type: Boolean, default: false },
 
+    // --- CÁC TRƯỜNG CHO TÍNH NĂNG TOPPING & SIZE (MÔ-ĐUN 01) ---
+    sizes: [{
+        name: { type: String, required: true },
+        priceOffset: { type: Number, default: 0 }
+    }],
+    toppings: [{
+        name: { type: String, required: true },
+        price: { type: Number, required: true }
+    }],
+    // -------------------------------------------------------------
+
+    // --- CÁC TRƯỜNG CHO TÍNH NĂNG SMART UPSELLING (MÔ-ĐUN 02) ---
+    upsellProducts: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Product'
+    }],
+    // -------------------------------------------------------------
+
     // --- CÁC TRƯỜNG MỚI CHO TÍNH NĂNG ĐÁNH GIÁ ---
     reviews: [reviewSchema], // Mảng chứa các đánh giá
     averageRating: { type: Number, required: true, default: 0 }, // Điểm trung bình

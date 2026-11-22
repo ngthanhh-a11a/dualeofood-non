@@ -16,11 +16,38 @@ import { useSocket } from '../../contexts/SocketContext'; // Lắng nghe real-ti
 import { formatDistanceToNow } from 'date-fns'; // Hiển thị "5 phút trước"
 import { vi } from 'date-fns/locale'; // Ngôn ngữ Tiếng Việt
 import toast from 'react-hot-toast';
+import { usePWA } from '../../utils/usePWA';
+import IOSInstallModal from './IOSInstallModal';
 
 const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // State cho dropdown của user
   const navigate = useNavigate();
   const location = useLocation(); // Lấy vị trí hiện tại
+
+  // --- START: PWA INSTALLATION LOGIC ---
+  const { isInstalled, isIOS, installPWA } = usePWA();
+  const [isIOSModalOpen, setIsIOSModalOpen] = useState(false);
+
+  const handleInstallPWAFromHeader = async () => {
+    closeUserSidebar();
+    if (isIOS) {
+      setIsIOSModalOpen(true);
+      return;
+    }
+    const result = await installPWA();
+    if (!result.success) {
+      if (result.isIOS) {
+        setIsIOSModalOpen(true);
+      } else {
+        toast('Để cài đặt ứng dụng: Mở menu trình duyệt (⋮) chọn "Cài đặt ứng dụng" hoặc "Thêm vào MH chính"!', {
+          icon: '📲',
+          duration: 5000,
+          style: { borderRadius: '14px', background: '#0284c7', color: '#fff', fontWeight: 'bold' }
+        });
+      }
+    }
+  };
+  // --- END: PWA INSTALLATION LOGIC ---
 
   // --- START: STATE VÀ LOGIC CHO HỆ THỐNG THÔNG BÁO ---
   const [notifications, setNotifications] = useState([]);
@@ -295,7 +322,7 @@ const Header = () => {
         .custom-notif-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
         .custom-notif-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-        /* ── User Sidebar Drawer CSS ── */
+        /* ── User Sidebar Drawer CSS (Đã tối ưu tốc độ siêu mượt 60fps) ── */
         #user-sidebar-drawer {
           position: fixed;
           inset: 0;
@@ -309,33 +336,12 @@ const Header = () => {
           gap: 0.6rem;
           overflow-x: hidden;
           overflow-y: auto;
-          transition: visibility 0.65s ease;
+          transition: visibility 0.25s ease;
         }
         @media (min-width: 640px) {
           #user-sidebar-drawer {
-            padding: 1.25rem;
-            gap: 0.75rem;
-          }
-        }
-        #user-sidebar-drawer {
-          position: fixed;
-          inset: 0;
-          z-index: 300;
-          padding: 0.75rem;
-          pointer-events: none;
-          visibility: hidden;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-end;
-          gap: 0.6rem;
-          overflow-x: hidden;
-          overflow-y: auto;
-          transition: visibility 0.45s ease;
-        }
-        @media (min-width: 640px) {
-          #user-sidebar-drawer {
-            padding: 1.25rem;
-            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            gap: 0.65rem;
           }
         }
         #user-sidebar-drawer.open {
@@ -351,7 +357,7 @@ const Header = () => {
           backdrop-filter: blur(3px);
           opacity: 0;
           pointer-events: none;
-          transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+          transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
         #user-sidebar-drawer.open .user-sidebar-bg {
           opacity: 1;
@@ -365,27 +371,41 @@ const Header = () => {
           position: relative;
           z-index: 10;
           pointer-events: auto;
-          transform: translateX(110%);
+          transform: translate3d(108%, 0, 0);
           opacity: 0;
           border: none;
           user-select: none;
           will-change: transform, opacity;
-          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
         }
 
-        /* Khi đóng/thoát ra: Top và Bottom trượt ra êm ái theo đường cong tự nhiên */
+        /* 1. KHỐI TRÊN (TOP): Menu & Hồ sơ (Hiển thị trọn vẹn không thanh trượt) */
         .user-sidebar-panel-top {
           background: #ffffff;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.12), 0 2px 10px rgba(0,0,0,0.06);
-          flex: 1;
-          overflow-y: auto;
-          padding: 1.25rem 1.5rem;
+          box-shadow: 0 10px 35px rgba(0,0,0,0.08), 0 2px 10px rgba(0,0,0,0.04);
+          padding: 1.15rem 1.35rem;
           display: flex;
           flex-direction: column;
-          max-height: calc(90vh - 80px);
-          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
           transition-delay: 0s;
         }
+
+        /* 2. KHỐI Ở GIỮA (MIDDLE): Banner Trắng Xanh Nước Biển Chuẩn Bố Cục Ảnh Mẫu */
+        .user-sidebar-panel-middle {
+          background: linear-gradient(125deg, #ffffff 0%, #f0f9ff 35%, #bae6fd 75%, #38bdf8 100%);
+          box-shadow: 0 10px 25px rgba(2, 132, 199, 0.14), 0 2px 8px rgba(0,0,0,0.04);
+          border: 1px solid #bae6fd;
+          padding: 1.1rem 1.35rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          position: relative;
+          overflow: hidden;
+          transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+          transition-delay: 0.02s;
+        }
+
+        /* 3. KHỐI DƯỚI (BOTTOM): Đăng xuất & Hỗ trợ */
         .user-sidebar-panel-bottom {
           background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
           box-shadow: 0 10px 30px rgba(2, 132, 199, 0.28), 0 2px 10px rgba(0,0,0,0.06);
@@ -394,8 +414,8 @@ const Header = () => {
           align-items: center;
           justify-content: space-between;
           min-height: 64px;
-          transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
-          transition-delay: 0.08s;
+          transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
+          transition-delay: 0.04s;
         }
 
         /* ── Animated Logout Button ── */
@@ -535,18 +555,22 @@ const Header = () => {
         }
 
 
-        /* Khi mở 3 gạch: Trồi ra mượt mà 60fps chuẩn phong cách cao cấp */
+        /* Khi mở 3 gạch: Trượt ra siêu nhanh và dứt khoát chuẩn 60fps/120fps */
         #user-sidebar-drawer.open .user-sidebar-panel {
-          transform: translateX(0);
+          transform: translate3d(0, 0, 0);
           opacity: 1;
         }
         #user-sidebar-drawer.open .user-sidebar-panel-top {
-          transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+          transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
           transition-delay: 0s;
         }
+        #user-sidebar-drawer.open .user-sidebar-panel-middle {
+          transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+          transition-delay: 0.035s;
+        }
         #user-sidebar-drawer.open .user-sidebar-panel-bottom {
-          transition: transform 0.48s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
-          transition-delay: 0.08s;
+          transition: transform 0.26s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+          transition-delay: 0.07s;
         }
 
         /* ── Menu Item: Hiệu ứng lan tỏa màu xanh từ trái sang phải từ từ chậm rãi bao phủ cả icon ── */
@@ -600,9 +624,6 @@ const Header = () => {
           color: #0284c7;
           transform: scale(1.1);
         }
-        .user-sidebar-panel-top::-webkit-scrollbar { width: 4px; }
-        .user-sidebar-panel-top::-webkit-scrollbar-track { background: #f8fafc; border-radius: 999px; }
-        .user-sidebar-panel-top::-webkit-scrollbar-thumb { background: #bae6fd; border-radius: 999px; }
       `}</style>
       <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex justify-between items-center gap-1 sm:gap-2">
         
@@ -1046,7 +1067,61 @@ const Header = () => {
             </div>
           </div>
 
-          {/* ── PANEL 2: ĐĂNG XUẤT TÀI KHOẢN & HỖ TRỢ 24/7 (Bottom — Nền xanh thương hiệu) ── */}
+          {/* ── PANEL 2 (Ở GIỮA): KHỐI BANNER TRẮNG XANH NƯỚC BIỂN THEO BỐ CỤC ẢNH MẪU (KHÔNG ICON) ── */}
+          <div
+            className="user-sidebar-panel user-sidebar-panel-middle"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cột trái: Văn bản phân tầng & Nút bấm bo tròn kiểu viên thuốc */}
+            <div className="relative z-10 max-w-[64%]">
+              <p className="text-[11px] font-bold text-sky-700/80 mb-0.5 tracking-tight">
+                Trải nghiệm ứng dụng di động
+              </p>
+              <h4 className="text-base sm:text-lg font-black text-slate-800 leading-tight mb-2.5">
+                Cài Đặt App DualeoFood!
+              </h4>
+
+              {isInstalled ? (
+                <span className="inline-block px-4 py-1.5 rounded-full bg-sky-600 text-white text-xs font-bold shadow-xs">
+                  Đã Cài Đặt
+                </span>
+              ) : isIOS ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeUserSidebar();
+                    setIsIOSModalOpen(true);
+                  }}
+                  className="px-5 py-2 rounded-full bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-sky-600/30 transition cursor-pointer"
+                >
+                  Cài Đặt Ngay
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleInstallPWAFromHeader}
+                  className="px-5 py-2 rounded-full bg-sky-600 hover:bg-sky-700 active:scale-95 text-white text-xs font-bold shadow-md shadow-sky-600/30 transition cursor-pointer"
+                >
+                  Cài Đặt Ngay
+                </button>
+              )}
+            </div>
+
+            {/* Cột phải: Minh họa các thanh layer xếp tầng trừu tượng (như ảnh mẫu, không icon) */}
+            <div className="relative z-0 flex flex-col gap-1.5 -mr-3 rotate-[-7deg] pointer-events-none select-none">
+              <div className="w-28 h-5 rounded-lg bg-white/80 shadow-xs border border-sky-100 flex items-center justify-end px-2">
+                <div className="w-2 h-2 rounded-full bg-sky-200"></div>
+              </div>
+              <div className="w-32 h-6 rounded-lg bg-gradient-to-r from-sky-400 to-sky-500 shadow-md flex items-center justify-end px-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-white"></div>
+              </div>
+              <div className="w-28 h-5 rounded-lg bg-white/80 shadow-xs border border-sky-100 flex items-center justify-end px-2">
+                <div className="w-2 h-2 rounded-full bg-sky-300"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── PANEL 3: ĐĂNG XUẤT TÀI KHOẢN & HỖ TRỢ 24/7 (Bottom — Nền xanh thương hiệu giữ y cũ) ── */}
           <div
             className="user-sidebar-panel user-sidebar-panel-bottom"
             onClick={(e) => e.stopPropagation()}
@@ -1126,6 +1201,12 @@ const Header = () => {
           <span className="text-[10px]">Tài khoản</span>
         </button>
       </nav>
+
+      {/* Modal Hướng Dẫn Cài Đặt Cho iOS */}
+      <IOSInstallModal
+        isOpen={isIOSModalOpen}
+        onClose={() => setIsIOSModalOpen(false)}
+      />
     </>
   );
 };

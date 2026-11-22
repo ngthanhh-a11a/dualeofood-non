@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../../utils/axiosConfig';
 import toast from 'react-hot-toast';
-import { FiSave, FiSettings, FiTruck, FiCreditCard, FiTrash2, FiPlus } from 'react-icons/fi';
+import { FiSave, FiSettings, FiTruck, FiCreditCard, FiTrash2, FiPlus, FiMapPin, FiNavigation, FiInfo } from 'react-icons/fi';
 import { FaStore } from 'react-icons/fa';
+import { getCurrentCoordinates, reverseGeocodeOSM } from '../../utils/geolocation';
 
 const AdminSettings = () => {
   const [activeTab, setActiveTab] = useState('store');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocatingStore, setIsLocatingStore] = useState(false);
 
   // States
   const [storeInfo, setStoreInfo] = useState({ name: '', address: '', phone: '', email: '' });
-  const [shippingFees, setShippingFees] = useState([]);
   const [operationalAreas, setOperationalAreas] = useState([]);
+  const [shippingConfig, setShippingConfig] = useState({
+    enabled: true,
+    restaurantLocation: {
+      address: '123 Đường Bánh Mì, Quận Gà Rán, TP. HCM',
+      lat: 10.776889,
+      lng: 106.700806
+    },
+    baseDistanceKm: 3,
+    baseFee: 15000,
+    pricePerKm: 5000,
+    maxDistanceKm: 25
+  });
   
   // Order Settings (Tự động xóa)
   const [orderSettings, setOrderSettings] = useState({ enabled: false, deleteAfterDays: 90 });
@@ -27,10 +40,19 @@ const AdminSettings = () => {
         ]);
         
         if (generalRes.data && generalRes.data.value) {
-          const { storeInfo, shippingFees, operationalAreas } = generalRes.data.value;
+          const { storeInfo, operationalAreas, shippingConfig: savedShippingConfig } = generalRes.data.value;
           setStoreInfo(storeInfo || { name: '', address: '', phone: '', email: '' });
-          setShippingFees(shippingFees || []);
           setOperationalAreas(operationalAreas || []);
+          if (savedShippingConfig) {
+            setShippingConfig(prev => ({
+              ...prev,
+              ...savedShippingConfig,
+              restaurantLocation: {
+                ...prev.restaurantLocation,
+                ...(savedShippingConfig.restaurantLocation || {})
+              }
+            }));
+          }
         }
         
         if (orderRes.data && orderRes.data.value && orderRes.data.value.autoDelete) {
@@ -51,15 +73,40 @@ const AdminSettings = () => {
     try {
       const payload = {
         storeInfo,
-        shippingFees,
-        operationalAreas
+        operationalAreas,
+        shippingConfig
       };
       await axios.put('/settings/general', payload);
-      toast.success('Lưu cấu hình chung thành công!');
+      toast.success('Lưu cấu hình chung và cước ship GPS thành công!');
     } catch (error) {
       toast.error('Lỗi khi lưu cấu hình chung!');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Tự động lấy tọa độ GPS vị trí thực tế của Quán ăn
+  const handleGetStoreGPS = async () => {
+    setIsLocatingStore(true);
+    const toastId = toast.loading('Đang lấy tín hiệu GPS của Quán...');
+    try {
+      const coords = await getCurrentCoordinates();
+      toast.loading('Đang cập nhật địa chỉ...', { id: toastId });
+      const addressName = await reverseGeocodeOSM(coords.lat, coords.lng);
+
+      setShippingConfig(prev => ({
+        ...prev,
+        restaurantLocation: {
+          address: addressName || prev.restaurantLocation.address,
+          lat: Number(coords.lat.toFixed(6)),
+          lng: Number(coords.lng.toFixed(6))
+        }
+      }));
+      toast.success('Đã cập nhật tọa độ GPS Quán ăn thành công!', { id: toastId });
+    } catch (err) {
+      toast.error(err.message || 'Không thể lấy tọa độ GPS của Quán.', { id: toastId });
+    } finally {
+      setIsLocatingStore(false);
     }
   };
 
@@ -76,20 +123,6 @@ const AdminSettings = () => {
   };
 
   // Các hàm helper cho array inputs
-  const handleAddShippingFee = () => {
-    setShippingFees([...shippingFees, { id: Date.now(), area: '', fee: 0 }]);
-  };
-  
-  const handleUpdateShippingFee = (index, field, value) => {
-    const updated = [...shippingFees];
-    updated[index][field] = field === 'fee' ? Number(value) : value;
-    setShippingFees(updated);
-  };
-  
-  const handleRemoveShippingFee = (index) => {
-    setShippingFees(shippingFees.filter((_, i) => i !== index));
-  };
-  
   const handleAddArea = () => {
     setOperationalAreas([...operationalAreas, '']);
   };
@@ -175,39 +208,236 @@ const AdminSettings = () => {
           {/* TAB: VẬN CHUYỂN & KHU VỰC */}
           {activeTab === 'shipping' && (
             <div className="space-y-8 animate-fade-in">
+              {/* KHỐI 1: CẤU HÌNH PHÍ SHIP THEO GPS & KHOẢNG CÁCH (MÔ-ĐUN 03) */}
+              <div className="p-5 sm:p-6 bg-gradient-to-br from-sky-50/70 via-white to-blue-50/50 rounded-2xl border border-sky-100 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-sky-100 pb-4">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
+                      <span className="p-1.5 bg-sky-500 text-white rounded-lg"><FiNavigation size={18} /></span>
+                      Phí Ship Tự Động Theo Số Km Thực Tế (GPS)
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Hệ thống tự đo cự ly từ Quán đến Khách để tính cước chính xác và minh bạch.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto bg-white px-3.5 py-2 rounded-xl border border-sky-200 shadow-2xs">
+                    <input 
+                      type="checkbox" 
+                      checked={shippingConfig.enabled} 
+                      onChange={e => setShippingConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                      className="w-4 h-4 text-sky-600 rounded focus:ring-sky-500"
+                    />
+                    <span className="text-xs font-bold text-slate-700">Kích hoạt tính theo km</span>
+                  </label>
+                </div>
+
+                {/* Vị trí quán */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                      <FiMapPin className="text-sky-600" /> Tọa độ Quán ăn (Gốc tính phí)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleGetStoreGPS}
+                      disabled={isLocatingStore}
+                      className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                    >
+                      <FiNavigation size={13} />
+                      {isLocatingStore ? 'Đang lấy vị trí...' : 'Lấy tọa độ quán hiện tại'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="md:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Vĩ độ (Latitude)</label>
+                      <input 
+                        type="number" 
+                        step="0.000001"
+                        value={shippingConfig.restaurantLocation?.lat || ''} 
+                        onChange={e => setShippingConfig(prev => ({
+                          ...prev,
+                          restaurantLocation: { ...prev.restaurantLocation, lat: parseFloat(e.target.value) || 0 }
+                        }))}
+                        placeholder="VD: 10.776889"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-sky-500 outline-none"
+                      />
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Kinh độ (Longitude)</label>
+                      <input 
+                        type="number" 
+                        step="0.000001"
+                        value={shippingConfig.restaurantLocation?.lng || ''} 
+                        onChange={e => setShippingConfig(prev => ({
+                          ...prev,
+                          restaurantLocation: { ...prev.restaurantLocation, lng: parseFloat(e.target.value) || 0 }
+                        }))}
+                        placeholder="VD: 106.700806"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-mono focus:ring-2 focus:ring-sky-500 outline-none"
+                      />
+                    </div>
+                    <div className="md:col-span-1">
+                      <label className="block text-[11px] font-semibold text-slate-500 mb-1">Địa chỉ Quán hiển thị</label>
+                      <input 
+                        type="text" 
+                        value={shippingConfig.restaurantLocation?.address || ''} 
+                        onChange={e => setShippingConfig(prev => ({
+                          ...prev,
+                          restaurantLocation: { ...prev.restaurantLocation, address: e.target.value }
+                        }))}
+                        placeholder="Địa chỉ số nhà, tên đường quán"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-sky-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bảng định mức giá cước thông minh - 5 Cột Rõ Ràng */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 pt-2">
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-sky-300 transition">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      1. Cự ly cơ sở
+                    </label>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                      <input 
+                        type="number" 
+                        min="1"
+                        value={shippingConfig.baseDistanceKm} 
+                        onChange={e => setShippingConfig(prev => ({ ...prev, baseDistanceKm: Math.max(1, Number(e.target.value)) }))}
+                        className="w-full bg-transparent text-sm font-black text-slate-800 outline-none"
+                      />
+                      <span className="text-xs font-bold text-slate-500 shrink-0">km</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">Áp dụng cước cơ sở (VD: 3km)</p>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-sky-300 transition">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      2. Cước cơ sở (đầu)
+                    </label>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                      <input 
+                        type="number" 
+                        step="1000"
+                        value={shippingConfig.baseFee} 
+                        onChange={e => setShippingConfig(prev => ({ ...prev, baseFee: Math.max(0, Number(e.target.value)) }))}
+                        className={`w-full bg-transparent text-sm font-black outline-none ${shippingConfig.baseFee === 0 ? 'text-emerald-600' : 'text-sky-600'}`}
+                      />
+                      <span className="text-xs font-bold text-slate-500 shrink-0">đ</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                      {shippingConfig.baseFee === 0 ? '🎉 Đang MIỄN PHÍ giao hàng' : `Giá trọn gói ${shippingConfig.baseDistanceKm}km đầu`}
+                    </p>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-sky-300 transition">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      3. Cước bắt đầu khi vượt
+                    </label>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                      <input 
+                        type="number" 
+                        step="1000"
+                        value={shippingConfig.startFeeAfterBase ?? 10000} 
+                        onChange={e => setShippingConfig(prev => ({ ...prev, startFeeAfterBase: Math.max(0, Number(e.target.value)) }))}
+                        className="w-full bg-transparent text-sm font-black text-indigo-600 outline-none"
+                      />
+                      <span className="text-xs font-bold text-slate-500 shrink-0">đ</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">Giá km đầu tiên sau mốc cơ sở (VD: 10k)</p>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-sky-300 transition">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      4. Phí mỗi km tiếp theo
+                    </label>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                      <input 
+                        type="number" 
+                        step="500"
+                        value={shippingConfig.pricePerKm} 
+                        onChange={e => setShippingConfig(prev => ({ ...prev, pricePerKm: Math.max(0, Number(e.target.value)) }))}
+                        className="w-full bg-transparent text-sm font-black text-amber-600 outline-none"
+                      />
+                      <span className="text-xs font-bold text-slate-500 shrink-0">đ/km</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">Cộng dồn các km sau đó (VD: 5k/km)</p>
+                  </div>
+
+                  <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs hover:border-sky-300 transition">
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      5. Bán kính tối đa
+                    </label>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                      <input 
+                        type="number" 
+                        min="5"
+                        value={shippingConfig.maxDistanceKm} 
+                        onChange={e => setShippingConfig(prev => ({ ...prev, maxDistanceKm: Math.max(1, Number(e.target.value)) }))}
+                        className="w-full bg-transparent text-sm font-black text-slate-700 outline-none"
+                      />
+                      <span className="text-xs font-bold text-slate-500 shrink-0">km</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">Cảnh báo nếu khách quá xa</p>
+                  </div>
+                </div>
+
+                {/* THẺ GIẢI THÍCH CÔNG THỨC & VÍ DỤ TRỰC QUAN KHỚP VỚI SỐ LIỆU */}
+                <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50/40 rounded-2xl border border-amber-200/80 text-xs text-amber-900 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-amber-800 text-sm">
+                    <FiInfo className="shrink-0 text-amber-600" size={17} />
+                    <span>Minh họa cách tính cước thực tế từ Quán:</span>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-slate-700">
+                    <div className="bg-white/80 p-3 rounded-xl border border-amber-100">
+                      <p className="font-bold text-slate-800 mb-1">
+                        📍 Đơn trong bán kính cơ sở (&le; {shippingConfig.baseDistanceKm} km):
+                      </p>
+                      <p className="text-slate-600">
+                        {shippingConfig.baseFee === 0 ? (
+                          <span className="text-emerald-700 font-bold">🎉 Miễn phí giao hàng (0đ) cho khách trong {shippingConfig.baseDistanceKm}km đầu.</span>
+                        ) : (
+                          <span>Cước cơ sở trọn gói = <strong className="text-sky-600 font-bold">{shippingConfig.baseFee?.toLocaleString('vi-VN')}đ</strong>.</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="bg-white/80 p-3 rounded-xl border border-amber-100">
+                      <p className="font-bold text-slate-800 mb-1">
+                        📍 Đơn giao xa hơn (&gt; {shippingConfig.baseDistanceKm} km - Ví dụ 5 km):
+                      </p>
+                      <p className="text-slate-600">
+                        {shippingConfig.baseFee === 0 ? (
+                          <span>
+                            Vừa vượt {shippingConfig.baseDistanceKm}km: bắt đầu là <strong>{(shippingConfig.startFeeAfterBase ?? 10000).toLocaleString('vi-VN')}đ</strong> (cho km {shippingConfig.baseDistanceKm}-{shippingConfig.baseDistanceKm + 1}) + thêm 1km &times; {shippingConfig.pricePerKm?.toLocaleString('vi-VN')}đ = <strong className="text-amber-700 font-bold">{((shippingConfig.startFeeAfterBase ?? 10000) + Math.max(0, 5 - (shippingConfig.baseDistanceKm + 1)) * shippingConfig.pricePerKm).toLocaleString('vi-VN')}đ</strong>.
+                          </span>
+                        ) : (
+                          <span>
+                            {shippingConfig.baseFee?.toLocaleString('vi-VN')}đ + ({5 - shippingConfig.baseDistanceKm}km &times; {shippingConfig.pricePerKm?.toLocaleString('vi-VN')}đ) = <strong className="text-amber-700 font-bold">{(shippingConfig.baseFee + (5 - shippingConfig.baseDistanceKm) * shippingConfig.pricePerKm).toLocaleString('vi-VN')}đ</strong>.
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* KHỐI 2: KHU VỰC HOẠT ĐỘNG */}
               <div>
                 <div className="flex justify-between items-center border-b pb-2 mb-4">
-                  <h2 className="text-lg font-bold text-gray-800">Khu Vực Hoạt Động</h2>
+                  <h2 className="text-lg font-bold text-gray-800">Khu Vực Hoạt Động (Giao hàng)</h2>
                   <button onClick={handleAddArea} className="text-sky-500 text-sm font-bold flex items-center gap-1 hover:text-sky-600"><FiPlus /> Thêm khu vực</button>
                 </div>
                 <div className="space-y-3">
                   {operationalAreas.map((area, index) => (
                     <div key={index} className="flex gap-3 items-center">
-                      <input type="text" value={area} onChange={e => handleUpdateArea(index, e.target.value)} placeholder="VD: Hà Nội, Quận 1..." className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-sky-500 outline-none" />
+                      <input type="text" value={area} onChange={e => handleUpdateArea(index, e.target.value)} placeholder="VD: Hà Nội, TP. Hồ Chí Minh..." className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-sky-500 outline-none" />
                       <button onClick={() => handleRemoveArea(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><FiTrash2 size={20} /></button>
                     </div>
                   ))}
                   {operationalAreas.length === 0 && <p className="text-sm text-gray-500 italic">Chưa có khu vực nào. Hãy thêm khu vực.</p>}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between items-center border-b pb-2 mb-4">
-                  <h2 className="text-lg font-bold text-gray-800">Cước Phí Vận Chuyển</h2>
-                  <button onClick={handleAddShippingFee} className="text-sky-500 text-sm font-bold flex items-center gap-1 hover:text-sky-600"><FiPlus /> Thêm cước phí</button>
-                </div>
-                <div className="space-y-3">
-                  {shippingFees.map((fee, index) => (
-                    <div key={index} className="flex gap-3 items-center">
-                      <input type="text" value={fee.area} onChange={e => handleUpdateShippingFee(index, 'area', e.target.value)} placeholder="Tên khu vực (VD: Nội thành)" className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-sky-500 outline-none" />
-                      <div className="relative">
-                        <input type="number" value={fee.fee} onChange={e => handleUpdateShippingFee(index, 'fee', e.target.value)} className="w-32 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-sky-500 outline-none" />
-                        <span className="absolute right-3 top-2.5 text-gray-500 text-sm font-bold">đ</span>
-                      </div>
-                      <button onClick={() => handleRemoveShippingFee(index)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><FiTrash2 size={20} /></button>
-                    </div>
-                  ))}
-                  {shippingFees.length === 0 && <p className="text-sm text-gray-500 italic">Chưa có biểu phí nào.</p>}
                 </div>
               </div>
 

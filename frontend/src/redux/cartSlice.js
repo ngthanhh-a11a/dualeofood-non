@@ -12,11 +12,22 @@ const calculateTotals = (state) => {
   let quantity = 0;
   let total = 0;
   state.items.forEach(item => {
-    quantity += item.quantity;
-    total += item.quantity * item.price;
+    quantity += Number(item.quantity) || 0;
+    total += (Number(item.quantity) || 0) * (Number(item.price) || 0);
   });
   state.totalQuantity = quantity;
   state.totalPrice = total;
+};
+
+// Hàm tạo định danh duy nhất cho từng dòng trong giỏ hàng
+export const generateCartItemId = (productId, size, toppings = [], note = '') => {
+  const sizeKey = size?.name ? size.name.trim() : 'standard';
+  const toppingKey = (toppings || [])
+    .map(t => (typeof t === 'string' ? t : t.name).trim())
+    .sort()
+    .join('_');
+  const noteKey = (note || '').trim();
+  return `${productId}-${sizeKey}-${toppingKey || 'notopping'}-${noteKey || 'nonote'}`;
 };
 
 const cartSlice = createSlice({
@@ -29,19 +40,33 @@ const cartSlice = createSlice({
       calculateTotals(state);
     },
 
-    // Action để thêm một sản phẩm vào giỏ
+    // Action để thêm một sản phẩm vào giỏ (hỗ trợ phân biệt Size / Topping / Ghi chú)
     addToCart: (state, action) => {
-      const newItem = action.payload;
-      const quantityToAdd = newItem.quantity || 1; // Luôn đảm bảo có số lượng, mặc định là 1
-      const existingItem = state.items.find(item => item.id === newItem.id);
+      const payload = action.payload;
+      const quantityToAdd = Number(payload.quantity) || 1;
+      const productId = payload.productId || payload.id;
+
+      // Tạo cartItemId nếu chưa có
+      const cartItemId = payload.cartItemId || generateCartItemId(
+        productId,
+        payload.size,
+        payload.toppings,
+        payload.note
+      );
+
+      const existingItem = state.items.find(item => item.id === cartItemId);
       if (existingItem) {
-        // **Lớp bảo vệ**: Đảm bảo quantity hiện tại là một số trước khi cộng dồn.
         existingItem.quantity = (Number(existingItem.quantity) || 0) + quantityToAdd;
       } else {
-        state.items.push({ ...newItem, quantity: quantityToAdd });
+        state.items.push({
+          ...payload,
+          id: cartItemId,
+          productId: productId,
+          quantity: quantityToAdd
+        });
       }
       calculateTotals(state);
-      toast.success(`${newItem.name} đã được thêm vào giỏ hàng!`);
+      toast.success(`${payload.name} đã được thêm vào giỏ hàng!`);
     },
 
     // Action để xóa một sản phẩm khỏi giỏ
@@ -62,14 +87,14 @@ const cartSlice = createSlice({
       state.totalPrice = 0;
     },
     
-    // Action CÒN THIẾU để cập nhật số lượng từ ô input
+    // Action cập nhật số lượng từ ô input
     updateQuantity: (state, action) => {
-        const { id, quantity } = action.payload;
-        const itemToUpdate = state.items.find(item => item.id === id);
-        if (itemToUpdate && quantity > 0) {
-            itemToUpdate.quantity = quantity;
-            calculateTotals(state);
-        }
+      const { id, quantity } = action.payload;
+      const itemToUpdate = state.items.find(item => item.id === id);
+      if (itemToUpdate && quantity > 0) {
+        itemToUpdate.quantity = quantity;
+        calculateTotals(state);
+      }
     },
   }
 });

@@ -4,7 +4,7 @@ import {
   FiMenu, FiHome, FiBox, FiTag, FiShoppingCart, FiLogOut, 
   FiMessageSquare, FiUsers, FiBell, FiMail, FiImage, FiFileText, 
   FiSettings, FiChevronLeft, FiSearch, FiGlobe, FiGrid, FiGift, 
-  FiMessageCircle, FiCheckCircle, FiClock, FiAlertCircle, FiRefreshCw, FiX
+  FiMessageCircle, FiCheckCircle, FiClock, FiAlertCircle, FiRefreshCw, FiX, FiZap
 } from 'react-icons/fi';
 import axios, { SERVER_URL, getImageUrl } from '../utils/axiosConfig';
 import { useSocket } from '../contexts/SocketContext';
@@ -240,6 +240,7 @@ const AdminLayout = () => {
           hasAlertDot: pendingCounts.pendingOrders > 0
         },
         { name: 'Món ăn', path: '/admin/products', icon: <FiBox /> },
+        { name: 'Gợi ý bán kèm (Upsell)', path: '/admin/upsell', icon: <FiZap /> },
         { name: 'Danh mục', path: '/admin/categories', icon: <FiGrid /> },
         { name: 'Mã Giảm Giá', path: '/admin/coupons', icon: <FiGift /> },
       ]

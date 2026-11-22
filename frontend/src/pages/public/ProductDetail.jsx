@@ -4,7 +4,7 @@ import { useDispatch } from 'react-redux';
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import { addToCart } from '../../redux/cartSlice';
 import toast from 'react-hot-toast';
-import { FiStar, FiShoppingCart, FiArrowLeft, FiEdit, FiEye, FiEyeOff } from 'react-icons/fi'; // Import FiShoppingCart
+import { FiStar, FiShoppingCart, FiArrowLeft, FiEdit, FiEye, FiEyeOff, FiPlus, FiMinus, FiCheck, FiEdit3 } from 'react-icons/fi'; // Import FiShoppingCart
 import { TbPinFilled } from 'react-icons/tb';
 import StarRating from '../../components/common/StarRating'; // Import component
 import ReviewModal from '../../components/features/ReviewModal';
@@ -23,12 +23,28 @@ const ProductDetail = () => {
   const [productToReview, setProductToReview] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
 
+  // States cho tính năng Tùy biến món (Size & Topping)
+  const [selectedSize, setSelectedSize] = useState(null);
+  const [selectedToppings, setSelectedToppings] = useState([]);
+  const [quantity, setQuantity] = useState(1);
+  const [note, setNote] = useState('');
+
   const fetchProduct = async () => {
     try {
       setLoading(true);
       const { data } = await axios.get(`/products/${id}`);
       setProduct(data);
       setError('');
+
+      // Khởi tạo tùy chọn mặc định
+      if (Array.isArray(data.sizes) && data.sizes.length > 0) {
+        setSelectedSize(data.sizes[0]);
+      } else {
+        setSelectedSize(null);
+      }
+      setSelectedToppings([]);
+      setQuantity(1);
+      setNote('');
 
       // Tải các sản phẩm liên quan dựa trên category
       if (data.category) {
@@ -99,17 +115,39 @@ const ProductDetail = () => {
     setIsReviewModalOpen(true);
   }
 
-  const handleAddToCart = (productToAdd, event) => {
+  const handleToggleTopping = (topping) => {
+    setSelectedToppings(prev => {
+      const exists = prev.some(t => t.name === topping.name);
+      if (exists) {
+        return prev.filter(t => t.name !== topping.name);
+      } else {
+        return [...prev, topping];
+      }
+    });
+  };
+
+  const unitPrice = (Number(product?.price) || 0) + 
+                    (Number(selectedSize?.priceOffset) || 0) + 
+                    selectedToppings.reduce((acc, t) => acc + (Number(t.price) || 0), 0);
+  const totalPrice = unitPrice * quantity;
+
+  const handleAddToCart = (e) => {
+    if (!product) return;
     dispatch(addToCart({
-      id: productToAdd._id,
-      name: productToAdd.name,
-      price: productToAdd.price,
-      image: productToAdd.image,
+      productId: product._id,
+      id: product._id,
+      name: product.name,
+      basePrice: product.price,
+      price: unitPrice,
+      image: product.image,
+      size: selectedSize,
+      toppings: selectedToppings,
+      note: note.trim(),
+      quantity: quantity
     }));
 
     // Kích hoạt animation từ hook, truyền vào ID của ảnh sản phẩm
     flyToCart(null, 'product-detail-image');
-
   };
 
   if (loading) {
@@ -130,13 +168,16 @@ const ProductDetail = () => {
     return <div className="text-center py-20">Không tìm thấy sản phẩm.</div>;
   }
 
+  const sizes = Array.isArray(product.sizes) ? product.sizes : [];
+  const toppings = Array.isArray(product.toppings) ? product.toppings : [];
+
   return (
     <div className="container mx-auto px-4 py-12">
       {/* Nút quay lại */}
       <div className="mb-8">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-gray-500 font-semibold hover:text-sky-500 transition-colors"
+          className="flex items-center gap-2 text-gray-500 font-semibold hover:text-sky-500 transition-colors cursor-pointer"
         >
           <FiArrowLeft />
           Quay lại
@@ -144,47 +185,188 @@ const ProductDetail = () => {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-start">
         {/* Cột ảnh sản phẩm */}
-        <div className="bg-gray-100 rounded-2xl p-8">
+        <div className="bg-gray-100 rounded-3xl p-8 sticky top-24 shadow-sm border border-slate-100">
           <img
-            id="product-detail-image" // Thêm ID để JS có thể tìm thấy
+            id="product-detail-image"
             src={`${getImageUrl(product.image)}`}
             alt={product.name}
-            className="w-full h-auto object-cover rounded-lg shadow-lg"
+            className="w-full h-auto max-h-[460px] object-contain mx-auto rounded-2xl"
           />
         </div>
 
-        {/* Cột thông tin sản phẩm */}
-        <div>
-          <h1 className="text-4xl font-extrabold text-gray-800 mb-4">{product.name}</h1>
-          
-          {/* Đánh giá */}
-          <div className="flex items-center gap-4 mb-6">
-            <StarRating rating={product.averageRating} />
-            <span className="text-gray-600 font-medium">
-              ({product.numReviews} đánh giá)
-            </span>
+        {/* Cột thông tin sản phẩm & Tùy biến */}
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-black text-slate-800 mb-3">{product.name}</h1>
+            
+            {/* Đánh giá */}
+            <div className="flex items-center gap-4 mb-4">
+              <StarRating rating={product.averageRating} />
+              <span className="text-gray-500 text-sm font-semibold">
+                ({product.numReviews} đánh giá)
+              </span>
+            </div>
+
+            <p className="text-gray-600 text-base leading-relaxed">{product.description || 'Món ăn đặc sản tươi ngon được chế biến theo công thức độc quyền.'}</p>
           </div>
 
-          <p className="text-gray-600 text-lg mb-6">{product.description}</p>
-
-          <div className="text-4xl font-black text-sky-500 mb-8">
-            {(product.price || 0).toLocaleString('vi-VN')}đ
+          {/* GIÁ TIỀN HIỂN THỊ */}
+          <div className="p-4 bg-sky-50/60 rounded-2xl border border-sky-100 flex items-baseline justify-between">
+            <div>
+              <span className="text-xs font-bold text-sky-600 uppercase tracking-wider block mb-0.5">Đơn giá một phần:</span>
+              <span className="text-3xl sm:text-4xl font-black text-sky-600">
+                {unitPrice.toLocaleString('vi-VN')}đ
+              </span>
+            </div>
+            {unitPrice > product.price && (
+              <span className="text-xs font-bold text-slate-400 line-through">
+                {(product.price || 0).toLocaleString('vi-VN')}đ
+              </span>
+            )}
           </div>
 
-          <div className="flex items-stretch gap-4 mb-8">
+          {/* PHẦN CHỌN SIZE */}
+          {sizes.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="font-extrabold text-slate-800 text-sm uppercase tracking-wider">
+                  📏 Chọn Kích Cỡ (Size)
+                </label>
+                <span className="text-xs font-bold text-sky-600 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
+                  Bắt buộc
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {sizes.map((s, idx) => {
+                  const isSelected = selectedSize?.name === s.name;
+                  const offset = Number(s.priceOffset) || 0;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setSelectedSize(s)}
+                      className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                        isSelected 
+                          ? 'border-sky-500 bg-sky-50/50 shadow-xs' 
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <p className={`font-bold text-sm ${isSelected ? 'text-sky-900' : 'text-slate-800'}`}>{s.name}</p>
+                      <p className={`text-xs font-extrabold mt-0.5 ${isSelected ? 'text-sky-600' : 'text-slate-500'}`}>
+                        {offset > 0 ? `+${offset.toLocaleString('vi-VN')}đ` : 'Mặc định'}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* PHẦN CHỌN TOPPING */}
+          {toppings.length > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="font-extrabold text-slate-800 text-sm uppercase tracking-wider">
+                  🧀 Thêm Topping
+                </label>
+                <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                  Tùy chọn
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {toppings.map((t, idx) => {
+                  const isChecked = selectedToppings.some(item => item.name === t.name);
+                  const price = Number(t.price) || 0;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleToggleTopping(t)}
+                      className={`p-3 rounded-2xl border-2 flex items-center justify-between transition-all cursor-pointer ${
+                        isChecked 
+                          ? 'border-emerald-500 bg-emerald-50/40 shadow-xs' 
+                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center ${
+                          isChecked ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300'
+                        }`}>
+                          {isChecked && <FiCheck className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <span className={`text-sm font-bold ${isChecked ? 'text-emerald-900' : 'text-slate-700'}`}>{t.name}</span>
+                      </div>
+                      <span className={`text-xs font-black ${isChecked ? 'text-emerald-600' : 'text-slate-500'}`}>
+                        +{price.toLocaleString('vi-VN')}đ
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* GHI CHÚ RIÊNG CHO MÓN */}
+          <div className="pt-2">
+            <label className="font-extrabold text-slate-800 text-sm uppercase tracking-wider flex items-center gap-2 mb-2">
+              <FiEdit3 className="text-slate-400" />
+              <span>Ghi Chú Cho Quán</span>
+            </label>
+            <input
+              type="text"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="VD: Không cay, cho nhiều sốt mè..."
+              maxLength={100}
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100 transition"
+            />
+          </div>
+
+          {/* BỘ ĐẾM SỐ LƯỢNG VÀ NÚT BẤM MUA */}
+          <div className="pt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Stepper số lượng */}
+            <div className="flex items-center justify-between bg-slate-100 rounded-2xl p-1 shrink-0 h-14 w-full sm:w-36">
+              <button
+                type="button"
+                onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                disabled={quantity <= 1}
+                className="w-12 h-full rounded-xl bg-white text-slate-700 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center transition shadow-xs cursor-pointer"
+              >
+                <FiMinus className="w-4 h-4" />
+              </button>
+              <span className="font-black text-slate-800 text-lg">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantity(q => q + 1)}
+                className="w-12 h-full rounded-xl bg-white text-slate-700 hover:bg-slate-200 flex items-center justify-center transition shadow-xs cursor-pointer"
+              >
+                <FiPlus className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Nút thêm vào giỏ hàng */}
             <button
-              onClick={(e) => handleAddToCart(product, e)}
-              className="flex-1 flex items-center justify-center gap-3 bg-sky-500 text-white font-bold py-4 px-8 rounded-xl hover:bg-sky-600 transition duration-300 text-lg shadow-md"
+              onClick={handleAddToCart}
+              className="flex-1 flex items-center justify-between bg-gradient-to-r from-sky-500 to-sky-600 text-white font-extrabold py-4 px-6 rounded-2xl hover:from-sky-600 hover:to-sky-700 transition duration-300 text-base shadow-lg shadow-sky-500/25 active:scale-[0.99] cursor-pointer"
             >
-              <FiShoppingCart />
-              Thêm vào giỏ hàng
+              <span className="flex items-center gap-2">
+                <FiShoppingCart className="w-5 h-5" />
+                <span>Thêm vào giỏ</span>
+              </span>
+              <span className="font-black text-lg">
+                {totalPrice.toLocaleString('vi-VN')}đ
+              </span>
             </button>
+
+            {/* Nút viết đánh giá */}
             <button
               onClick={() => handleOpenReviewModal(product)}
-              className="flex items-center justify-center bg-white border-2 border-sky-500 text-sky-500 font-bold p-4 rounded-xl hover:bg-sky-50 transition-all duration-300 shadow-md transform hover:scale-105 hover:shadow-lg"
+              className="flex items-center justify-center bg-white border-2 border-sky-500 text-sky-500 font-bold p-4 rounded-2xl hover:bg-sky-50 transition-all duration-300 shadow-sm shrink-0 cursor-pointer"
               title="Viết đánh giá"
             >
-              <FiEdit size={24} />
+              <FiEdit size={22} />
             </button>
           </div>
         </div>

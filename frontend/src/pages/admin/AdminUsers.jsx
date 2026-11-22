@@ -131,11 +131,11 @@ const AdminUsers = () => {
                         <button onClick={() => setStatsPeriod('12m')} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${statsPeriod === '12m' ? 'bg-sky-500 text-white shadow' : 'text-gray-600 hover:bg-gray-200'}`}>12 tháng</button>
                     </div>
                 </div>
-                <div style={{ width: '100%', height: 300 }}>
+                <div style={{ width: '100%', height: 300, minWidth: 0 }}>
                     {statsLoading ? (
                         <div className="w-full h-full flex items-center justify-center text-gray-500">Đang tải biểu đồ...</div>
                     ) : (
-                        <ResponsiveContainer>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <AreaChart data={statsData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">

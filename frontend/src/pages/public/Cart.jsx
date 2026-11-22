@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { removeFromCart, updateQuantity, clearCart, addToCart } from '../../redux/cartSlice';
 import axios, { SERVER_URL , getImageUrl } from '../../utils/axiosConfig';
 import toast from 'react-hot-toast';
 import { useAddToCartAnimation } from '../../hooks/useAddToCartAnimation';
+import ProductModal from '../../components/features/ProductModal';
 import { FiPlus, FiMinus, FiTrash2, FiTag, FiChevronLeft, FiChevronRight, FiPercent, FiGift, FiZap } from 'react-icons/fi';
 
 // --- Component con: Modal chọn Voucher ---
@@ -80,15 +81,23 @@ const VoucherModal = ({ isOpen, onClose, vouchers, onSelectVoucher, onApplyCode,
 
 // --- Component con: Card sản phẩm gợi ý Mua kèm deal sốc ---
 const SuggestedProductCard = ({ product, onAddToCart }) => {
-  // Tính giá gốc tượng trưng cao hơn 15% để tôn vinh deal sốc
   const originalPrice = Math.round((product.price * 1.15) / 1000) * 1000;
+  const hasOptions = (Array.isArray(product.sizes) && product.sizes.length > 0) || 
+                     (Array.isArray(product.toppings) && product.toppings.length > 0);
 
   return (
     <div className="product-card-suggested snap-start flex-shrink-0 w-44 sm:w-48 bg-white rounded-2xl shadow-xs border border-slate-100 p-3 sm:p-3.5 group hover:shadow-md hover:border-sky-200 transition-all duration-300 relative flex flex-col justify-between">
-      {/* Badge Deal Sốc */}
-      <span className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md bg-gradient-to-r from-red-500 to-amber-500 text-white text-[10px] font-black shadow-xs">
-        DEAL SỐC
-      </span>
+      {/* Badge Gợi Ý Bán Kèm */}
+      <div className="absolute top-2.5 left-2.5 z-10 flex flex-col gap-1 items-start">
+        <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-red-500 text-white text-[10px] font-black shadow-xs">
+          MUA KÈM
+        </span>
+        {hasOptions && (
+          <span className="px-1.5 py-0.2 rounded bg-sky-500/90 text-white text-[9px] font-bold">
+            Tùy chọn
+          </span>
+        )}
+      </div>
 
       <div>
         <div className="w-full aspect-square bg-slate-50 rounded-xl mb-2.5 overflow-hidden relative">
@@ -98,7 +107,7 @@ const SuggestedProductCard = ({ product, onAddToCart }) => {
             className="product-image w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
           />
         </div>
-        <h4 className="font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 h-9" title={product.name}>
+        <h4 className="font-bold text-xs sm:text-sm text-slate-800 line-clamp-2 h-9 leading-snug" title={product.name}>
           {product.name}
         </h4>
       </div>
@@ -106,7 +115,7 @@ const SuggestedProductCard = ({ product, onAddToCart }) => {
       <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
         <div>
           <p className="font-black text-sky-600 text-sm sm:text-base leading-tight">
-            {product.price.toLocaleString('vi-VN')}đ
+            {(product.price || 0).toLocaleString('vi-VN')}đ
           </p>
           <p className="text-[10px] text-slate-400 line-through">
             {originalPrice.toLocaleString('vi-VN')}đ
@@ -114,11 +123,11 @@ const SuggestedProductCard = ({ product, onAddToCart }) => {
         </div>
         <button 
           onClick={(e) => onAddToCart(product, e)}
-          className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-500 text-sky-600 hover:text-white rounded-xl font-bold text-xs transition-all duration-200 active:scale-90 flex items-center gap-1 cursor-pointer border border-sky-200 hover:border-sky-500"
-          title="Thêm món này vào giỏ hàng"
+          className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-500 text-sky-600 hover:text-white rounded-xl font-bold text-xs transition-all duration-200 active:scale-90 flex items-center gap-1 cursor-pointer border border-sky-200 hover:border-sky-500 shadow-xs"
+          title={hasOptions ? "Chọn size & topping cho món này" : "Thêm nhanh món này vào giỏ hàng"}
         >
           <FiPlus size={14} />
-          <span>Thêm</span>
+          <span>{hasOptions ? 'Chọn' : 'Thêm'}</span>
         </button>
       </div>
     </div>
@@ -141,6 +150,7 @@ const Cart = () => {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [suggestedProducts, setSuggestedProducts] = useState([]);
+  const [selectedProductForModal, setSelectedProductForModal] = useState(null);
 
   // 2. Gọi API lấy mã từ Ví
   useEffect(() => {
@@ -164,30 +174,50 @@ const Cart = () => {
       };
       fetchAvailableVouchers();
     }
-
-    // Gọi API lấy sản phẩm gợi ý
-    const fetchSuggestedProducts = async () => {
-      try {
-        const res = await axios.get('/products/pinned/all');
-        let products = res.data.products || [];
-        // Nếu sản phẩm ghim ít hơn 8 món, lấy thêm từ danh sách chung để luôn có gợi ý phong phú
-        if (products.length < 8) {
-          const generalRes = await axios.get('/products?limit=16');
-          const generalProducts = generalRes.data.products || [];
-          const existingIds = new Set(products.map(p => String(p._id)));
-          for (const gp of generalProducts) {
-            if (!existingIds.has(String(gp._id))) {
-              products.push(gp);
-            }
-          }
-        }
-        setSuggestedProducts(products);
-      } catch (error) {
-        console.error("Lỗi lấy sản phẩm gợi ý:", error);
-      }
-    };
-    fetchSuggestedProducts();
   }, [token]);
+
+  // Hàm tiện ích: Trích xuất ObjectId thực tế của món ăn từ dòng giỏ hàng (loại bỏ composite suffix)
+  const getProductActualId = (item) => {
+    if (!item) return '';
+    if (item.productId) return String(item.productId);
+    if (item._id) return String(item._id);
+    if (typeof item.id === 'string' && item.id.includes('-')) {
+      return item.id.split('-')[0];
+    }
+    return String(item.id || '');
+  };
+
+  // Khóa chuỗi ID sản phẩm thực tế trong giỏ hàng
+  const cartProductIdsKey = useMemo(() => {
+    return Array.from(new Set(
+      cartItems.map(item => getProductActualId(item)).filter(Boolean)
+    )).sort().join(',');
+  }, [cartItems]);
+
+  // Gọi API Smart Upsell dựa trên các món đang có trong giỏ hàng
+  const fetchSuggestedProducts = useCallback(async () => {
+    try {
+      const res = await axios.get('/products/upsell-suggestions', {
+        params: { cartProductIds: cartProductIdsKey }
+      });
+      setSuggestedProducts(res.data.products || []);
+    } catch (error) {
+      console.error("Lỗi lấy sản phẩm gợi ý bán kèm:", error);
+    }
+  }, [cartProductIdsKey]);
+
+  useEffect(() => {
+    fetchSuggestedProducts();
+  }, [fetchSuggestedProducts]);
+
+  // Tự động đồng bộ lại khi người dùng vừa chuyển tab từ trang Quản trị Admin sang
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchSuggestedProducts();
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchSuggestedProducts]);
 
   // Ref và hàm cuộn ngang danh sách Mua kèm deal sốc
   const suggestedScrollRef = useRef(null);
@@ -198,14 +228,14 @@ const Cart = () => {
     }
   };
 
-  // LỌC SẠCH: Loại bỏ hoàn toàn các món đã có trong giỏ hàng (không bao giờ bị trùng)
-  const cartItemIds = useMemo(() => {
-    return new Set(cartItems.map(item => String(item.id || item._id)));
+  // LỌC SẠCH: Loại bỏ hoàn toàn các món đã có trong giỏ hàng (so sánh đúng ObjectId)
+  const cartItemProductIds = useMemo(() => {
+    return new Set(cartItems.map(item => getProductActualId(item)).filter(Boolean));
   }, [cartItems]);
 
   const filteredSuggestedProducts = useMemo(() => {
-    return suggestedProducts.filter(p => !cartItemIds.has(String(p._id)));
-  }, [suggestedProducts, cartItemIds]);
+    return suggestedProducts.filter(p => !cartItemProductIds.has(String(p._id)));
+  }, [suggestedProducts, cartItemProductIds]);
 
   // 3. Hàm tính toán và áp dụng voucher
   const handleApplyVoucher = (voucherItem) => {
@@ -273,19 +303,32 @@ const Cart = () => {
     if (window.confirm('Bạn có chắc muốn xóa toàn bộ giỏ hàng?')) dispatch(clearCart());
   };
 
-  // Hàm thêm sản phẩm gợi ý vào giỏ
+  // Hàm thêm sản phẩm gợi ý vào giỏ: nếu có tùy chọn thì mở modal, không thì thêm nhanh 1 chạm
   const handleAddSuggestedToCart = (product, event) => {
-    dispatch(addToCart({
-      id: product._id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-    }));
-    flyToCart(event);
+    const hasOptions = (Array.isArray(product.sizes) && product.sizes.length > 0) || 
+                       (Array.isArray(product.toppings) && product.toppings.length > 0);
+
+    if (hasOptions) {
+      setSelectedProductForModal(product);
+    } else {
+      dispatch(addToCart({
+        id: product._id,
+        name: product.name,
+        price: product.price,
+        image: product.image,
+      }));
+      flyToCart(event);
+      toast.success(`Đã thêm "${product.name}" vào giỏ hàng!`);
+    }
   };
 
-  const shippingFee = 15000;
-  const finalPrice = Math.max(0, totalPrice + shippingFee - discountAmount);
+  // Handler nhận kết quả từ ProductModal (kèm size, topping, note)
+  const handleAddFromModal = (cartItemPayload) => {
+    dispatch(addToCart(cartItemPayload));
+    toast.success(`Đã thêm "${cartItemPayload.name}" vào giỏ hàng!`);
+  };
+
+  const finalPrice = Math.max(0, totalPrice - discountAmount);
 
   return (
     <>
@@ -320,9 +363,30 @@ const Cart = () => {
               {cartItems.map(item => (
                   <div key={item.id} className="flex items-center gap-4">
                     <img src={`${getImageUrl(item.image)}`} alt={item.name} className="w-24 h-24 rounded-xl object-cover border" />
-                    <div className="flex-1">
-                      <h3 className="font-bold text-gray-800 text-lg">{item.name}</h3>
-                      <p className="text-sky-500 font-black text-xl mt-1">{item.price.toLocaleString('vi-VN')}đ</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-800 text-lg leading-tight">{item.name}</h3>
+                      
+                      {/* Hiển thị Size và Topping nếu có */}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                        {item.size?.name && (
+                          <span className="font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-100">
+                            Size: {item.size.name}
+                          </span>
+                        )}
+                        {Array.isArray(item.toppings) && item.toppings.length > 0 && (
+                          <span className="font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            + {item.toppings.map(t => t.name).join(', ')}
+                          </span>
+                        )}
+                      </div>
+
+                      {item.note && (
+                        <p className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md mt-1 italic inline-block border border-amber-100/80">
+                          📝 {item.note}
+                        </p>
+                      )}
+
+                      <p className="text-sky-500 font-black text-xl mt-1.5">{item.price?.toLocaleString('vi-VN')}đ</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center border rounded-lg">
@@ -397,7 +461,10 @@ const Cart = () => {
               <h2 className="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Tổng kết đơn hàng</h2>
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between font-medium text-gray-700"><span>Tạm tính:</span><span>{totalPrice.toLocaleString('vi-VN')}đ</span></div>
-                <div className="flex justify-between font-medium text-gray-700"><span>Phí giao hàng:</span><span>{shippingFee.toLocaleString('vi-VN')}đ</span></div>
+                <div className="flex justify-between items-center font-medium text-gray-700">
+                  <span>Phí giao hàng:</span>
+                  <span className="text-slate-500 font-semibold text-sm bg-slate-100 px-2.5 py-0.5 rounded-md">Chưa tính</span>
+                </div>
                 
                 {/* Khu vực Voucher được thiết kế lại */}
                 <div className="border-t pt-4 mt-4">
@@ -419,8 +486,11 @@ const Cart = () => {
                   )}
                 </div>
               </div>
-              <div className="flex justify-between items-center border-t-2 border-dashed pt-4">
-                <span className="text-lg font-bold">Tổng cộng:</span>
+              <div className="flex justify-between items-baseline border-t-2 border-dashed pt-4">
+                <div>
+                  <span className="text-lg font-bold block text-slate-800">Tổng cộng:</span>
+                  <span className="text-xs text-slate-400 block font-normal">(Chưa gồm phí vận chuyển)</span>
+                </div>
                 <span className="text-2xl font-black text-sky-600">{finalPrice.toLocaleString('vi-VN')}đ</span>
               </div>
               <button onClick={handleCheckout} className="mt-6 w-full bg-sky-500 text-white font-bold py-3.5 rounded-xl hover:bg-sky-600 transition-all duration-300 shadow-lg shadow-sky-500/30 active:scale-95">
@@ -432,6 +502,13 @@ const Cart = () => {
       )}
     </div>
     </div>
+      {selectedProductForModal && (
+        <ProductModal
+          product={selectedProductForModal}
+          onClose={() => setSelectedProductForModal(null)}
+          onAddToCart={handleAddFromModal}
+        />
+      )}
     </>
   );
 };

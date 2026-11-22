@@ -5,6 +5,7 @@ import { openAuthModal } from './redux/uiSlice';
 import { Toaster } from 'react-hot-toast';
 import Header from './components/common/Header';
 import Footer from './components/common/Footer';
+import OfflineBanner from './components/common/OfflineBanner';
 import Home from './pages/public/Home';
 import About from './pages/public/About';
 import Menu from './pages/public/Menu';
@@ -47,6 +48,7 @@ import BannerManager from './pages/admin/BannerManager';
 import ArticleManager from './pages/admin/ArticleManager';
 import AdminSettings from './pages/admin/AdminSettings';
 import ReviewManager from './pages/admin/ReviewManager';
+import AdminUpsell from './pages/admin/AdminUpsell';
 
 // === NHÚNG CÁC COMPONENT STAFF (MỚI) ===
 import StaffLayout from './layouts/StaffLayout';
@@ -70,6 +72,18 @@ function App() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  // Tự động cuộn lên đầu trang mỗi khi chuyển trang (trừ khi có hash anchor)
+  useEffect(() => {
+    if (!location.hash) {
+      window.scrollTo(0, 0);
+    } else {
+      const element = document.getElementById(location.hash.substring(1));
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [location.pathname, location.hash]);
+
   // Bắt sự kiện requireLogin từ PrivateRoute để bật modal
   useEffect(() => {
     if (location.state?.requireLogin) {
@@ -83,6 +97,9 @@ function App() {
     <div className="min-h-screen bg-white font-sans">
       {/* Auth Modal toàn cục */}
       <AuthModal />
+
+      {/* Banner thông báo trạng thái mạng Offline/Online */}
+      <OfflineBanner />
       
       {/* Container để hiển thị các thông báo toast từ react-hot-toast */}
       <Toaster position="top-right" reverseOrder={false} />
@@ -131,6 +148,7 @@ function App() {
         }>
           <Route index element={<AdminDashboard />} />
           <Route path="products" element={<AdminProducts />} />
+          <Route path="upsell" element={<AdminUpsell />} />
           <Route path="coupons" element={<AdminCoupons />} />         
           <Route path="orders" element={<AdminOrders />} />
           <Route path="messages" element={<AdminMessages />} />

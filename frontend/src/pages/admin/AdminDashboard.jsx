@@ -539,8 +539,8 @@ const AdminDashboard = () => {
                     <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <FiStar className="text-yellow-500" /> Phân Bổ Đánh Giá
                     </h3>
-                    <div style={{ width: '100%', height: 300 }}>
-                        <ResponsiveContainer>
+                    <div style={{ width: '100%', height: 300, minWidth: 0 }}>
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                             <PieChart>
                                 <Pie
                                     data={reviewStats.ratingDistribution}
